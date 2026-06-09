@@ -1,0 +1,8 @@
+@model IEnumerable<WorkItem>
+@{ ViewData["Title"] = "Standup"; ViewData["PageTitle"] = "Standup View"; }
+<div class="panel"><div class="panel-header"><h2>Developer / QA Standup</h2><button class="btn btn-outline-primary btn-sm" onclick="window.print()">Print</button></div>
+@foreach(var group in Model.GroupBy(x => x.AssignedDeveloper?.FullName ?? "Unassigned")){
+    <h4 class="mt-4">@group.Key</h4>
+    <partial name="_WorkItemTable" model="group" />
+}
+</div>

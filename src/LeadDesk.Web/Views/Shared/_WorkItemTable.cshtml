@@ -1,0 +1,61 @@
+@model IEnumerable<WorkItem>
+@functions {
+    private static string BadgeKey(string? value) =>
+        string.IsNullOrWhiteSpace(value)
+            ? "unknown"
+            : value.Trim().ToLowerInvariant().Replace(".", "").Replace(" ", "-");
+
+    private static string Initial(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "?" : value.Trim().Substring(0, 1).ToUpperInvariant();
+
+    private static string AvatarClass(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "avatar-tone-0";
+        var bucket = Math.Abs(value.Trim().ToUpperInvariant()[0]) % 6;
+        return $"avatar-tone-{bucket}";
+    }
+}
+<div class="table-responsive card-table">
+<table class="table align-middle">
+    <thead><tr><th>Task</th><th>Account</th><th>Status</th><th>Priority</th><th>Dev</th><th>Due</th><th class="text-end">Actions</th></tr></thead>
+    <tbody>
+    @foreach (var item in Model)
+    {
+        var developerName = item.AssignedDeveloper?.FullName;
+        <tr>
+            <td><a asp-controller="WorkItems" asp-action="Details" asp-route-id="@item.Id" class="fw-semibold">@item.Title</a><div class="small text-muted">@item.ModuleName / @item.Type</div></td>
+            <td>@item.AccountPractice?.Name</td>
+            <td><span class="badge status-badge status-@BadgeKey(item.Status)">@item.Status</span></td>
+            <td><span class="priority priority-pill priority-@BadgeKey(item.Priority)">@item.Priority</span></td>
+            <td>
+                @if (!string.IsNullOrWhiteSpace(developerName))
+                {
+                    <span class="member-chip"><span class="member-avatar @AvatarClass(developerName)">@Initial(developerName)</span><span>@developerName</span></span>
+                }
+                else
+                {
+                    <span class="text-muted">Unassigned</span>
+                }
+            </td>
+            <td>@item.DueDate?.ToString("dd MMM")</td>
+            <td>
+                <div class="d-flex justify-content-end gap-1">
+                    @if (item.Status != "Released" && item.Status != "Cancelled")
+                    {
+                        <form asp-controller="WorkItems" asp-action="Complete" asp-route-id="@item.Id" method="post">
+                            <button class="btn btn-light btn-sm" type="submit" title="Complete task"><i class="bi bi-check2"></i></button>
+                        </form>
+                    }
+                    @if (User.IsInRole("Admin") || User.IsInRole("ProjectLead") || User.IsInRole("Manager"))
+                    {
+                        <form asp-controller="WorkItems" asp-action="Delete" asp-route-id="@item.Id" method="post" onsubmit="return confirm('Delete this task? It will be hidden but kept in the database.');">
+                            <button class="btn btn-light btn-sm text-danger" type="submit" title="Delete task"><i class="bi bi-trash"></i></button>
+                        </form>
+                    }
+                </div>
+            </td>
+        </tr>
+    }
+    </tbody>
+</table>
+</div>

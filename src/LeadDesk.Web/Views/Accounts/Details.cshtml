@@ -1,0 +1,4 @@
+@model AccountPractice
+@{ ViewData["Title"] = Model.Name; ViewData["PageTitle"] = Model.Name; }
+<div class="panel"><div class="panel-header"><h2>Account Summary</h2><a asp-action="Edit" asp-route-id="@Model.Id" class="btn btn-outline-primary btn-sm">Edit</a></div><p>@Model.Notes</p><div class="small text-muted">Contact: @Model.ClientContactName @Model.ClientContactEmail</div></div>
+<div class="panel mt-4"><div class="panel-header"><h2>Work Items</h2></div><partial name="_WorkItemTable" model="Model.WorkItems" /></div>
