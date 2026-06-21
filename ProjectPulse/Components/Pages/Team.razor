@@ -1,0 +1,7 @@
+@page "/team"
+@attribute [Authorize]
+@rendermode InteractiveServer
+<PageTitle>Team · ProjectPulse</PageTitle>
+<div class="page-heading"><div><span class="eyebrow">People</span><h1>Team</h1><p>The people responsible for delivery and quality.</p></div><a class="primary-button" href="team/new">＋ Add member</a></div>
+<section class="surface"><div class="card-grid">@foreach (var member in members) { <a class="entity-card person-card" href="team/@member.Id/edit"><div class="large-avatar">@Initial(member.FullName)</div><div><span class="role-pill">@member.Role</span><h2>@member.FullName</h2><p>@member.Email</p><small>@(member.IsActive ? "Active" : "Inactive")</small></div></a> }</div></section>
+@code { private List<TeamMember> members = []; protected override async Task OnInitializedAsync() => members = await LeadDesk.GetTeamAsync(); private static string Initial(string x) => string.IsNullOrWhiteSpace(x) ? "?" : x[..1]; }

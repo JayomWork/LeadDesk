@@ -1,7 +1,23 @@
-﻿@page "/"
-
-<PageTitle>Home</PageTitle>
-
-<h1>Hello, world!</h1>
-
-Welcome to your new app.
+@page "/"
+@attribute [Authorize]
+@rendermode InteractiveServer
+<PageTitle>Dashboard · ProjectPulse</PageTitle>
+<div class="page-heading"><div><span class="eyebrow">Today at a glance</span><h1>Dashboard</h1><p>Your delivery workspace, without the noise.</p></div><a class="primary-button" href="tasks/new">＋ Create task</a></div>
+@if (summary == null) { <div class="loading">Loading workspace…</div> }
+else
+{
+    <div class="metric-grid">
+        <Metric Label="Open tasks" Value="summary.TotalOpen" Tone="blue" />
+        <Metric Label="In development" Value="summary.InDevelopment" Tone="violet" />
+        <Metric Label="Ready for QA" Value="summary.ReadyForQa" Tone="cyan" />
+        <Metric Label="Blocked" Value="summary.Blocked" Tone="red" />
+        <Metric Label="Due this week" Value="summary.DueThisWeek" Tone="amber" />
+        <Metric Label="Released this month" Value="summary.ReleasedThisMonth" Tone="green" />
+    </div>
+    <section class="surface"><div class="section-head"><div><span class="eyebrow">Live activity</span><h2>Recent tasks</h2></div><a href="tasks">View all →</a></div><TaskTable Items="summary.RecentItems" OnStatusChanged="ChangeStatus" /></section>
+}
+@code {
+    private DashboardSummary? summary;
+    protected override async Task OnInitializedAsync() => summary = await LeadDesk.GetDashboardAsync();
+    private async Task ChangeStatus((WorkItem Item, string Status) change) => await LeadDesk.UpdateTaskStatusAsync(change.Item.Id, change.Status);
+}

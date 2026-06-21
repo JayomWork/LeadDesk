@@ -1,0 +1,13 @@
+@page "/tasks/{Id:long}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+<PageTitle>Task details · ProjectPulse</PageTitle>
+@if (item == null) { <div class="loading">Loading task…</div> }
+else
+{
+<div class="page-heading"><div><span class="eyebrow">@item.Type · @item.ModuleName</span><h1>@item.Title</h1><div class="inline-meta"><span class="priority priority-@Key(item.Priority)">@item.Priority</span><span>@item.Status</span><span>Due @item.DueDate?.ToString("dd MMM yyyy")</span></div></div><a class="secondary-button" href="tasks/@Id/edit">✎ Edit task</a></div>
+<div class="detail-grid"><section class="surface"><h2>Brief</h2><p class="preline">@(item.Description ?? "No description added.")</p><h3>Latest update</h3><p class="preline">@(item.LatestUpdate ?? "No update yet.")</p>@if (!string.IsNullOrWhiteSpace(item.BlockerReason)) { <div class="alert-card"><strong>Blocker</strong><p>@item.BlockerReason</p></div> }</section>
+<aside class="surface"><h2>Ownership</h2><dl class="detail-list"><dt>Accounts</dt><dd>@string.Join(", ", item.WorkItemAccounts.Select(x => x.AccountPractice.Name))</dd><dt>Developers</dt><dd>@string.Join(", ", item.WorkItemDevelopers.Select(x => x.TeamMember.FullName))</dd><dt>QA</dt><dd>@item.AssignedQa?.FullName</dd><dt>Owner</dt><dd>@item.Owner?.FullName</dd><dt>Release</dt><dd>@item.ReleaseVersion</dd></dl></aside></div>
+<section class="surface"><div class="section-head"><h2>Activity</h2></div><div class="timeline">@foreach (var update in item.Updates.OrderByDescending(x => x.CreatedAt)) { <div><i></i><strong>@update.NewStatus</strong><span>@update.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, hh:mm tt")</span><p>@update.UpdateText</p></div> }</div></section>
+}
+@code { [Parameter] public long Id { get; set; } private WorkItem? item; protected override async Task OnParametersSetAsync() => item = await LeadDesk.GetTaskAsync(Id); private static string Key(string value) => value.ToLowerInvariant().Replace(" ", "-"); }

@@ -6,5 +6,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
   </PropertyGroup>
-
+  <ItemGroup>
+    <ProjectReference Include="..\ProjectPulse.Application\ProjectPulse.Application.csproj" />
+    <ProjectReference Include="..\ProjectPulse.Infrastructure\ProjectPulse.Infrastructure.csproj" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.0" />
+  </ItemGroup>
 </Project>

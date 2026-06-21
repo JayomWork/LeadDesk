@@ -1,0 +1,8 @@
+@page "/team/new"
+@page "/team/{Id:long}/edit"
+@attribute [Authorize]
+@rendermode InteractiveServer
+<PageTitle>Team member · ProjectPulse</PageTitle>
+<div class="page-heading"><div><span class="eyebrow">Team profile</span><h1>@(Id == 0 ? "Add team member" : "Edit team member")</h1></div></div>
+<EditForm Model="model" OnValidSubmit="Save" FormName="team-form"><DataAnnotationsValidator /><ValidationSummary /><section class="surface form-surface"><div class="form-grid"><div class="field span-2"><label>Full name</label><InputText class="input" @bind-Value="model.FullName" /></div><div class="field"><label>Role</label><InputSelect class="input" @bind-Value="model.Role">@foreach (var x in LeadDeskOptions.Roles) { <option>@x</option> }</InputSelect></div><div class="field"><label>Email</label><InputText class="input" @bind-Value="model.Email" /></div><label class="check field"><InputCheckbox @bind-Value="model.IsActive" /> Active member</label></div><div class="form-actions"><button class="primary-button">Save member</button><a class="secondary-button" href="team">Cancel</a></div></section></EditForm>
+@code { [Parameter] public long Id { get; set; } private TeamMember model = new(); protected override async Task OnParametersSetAsync() => model = Id == 0 ? new TeamMember() : await LeadDesk.GetTeamMemberAsync(Id) ?? new(); private async Task Save() { await LeadDesk.SaveTeamMemberAsync(model); Navigation.NavigateTo("team"); } }

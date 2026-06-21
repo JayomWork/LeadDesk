@@ -1,0 +1,7 @@
+@page "/accounts"
+@attribute [Authorize]
+@rendermode InteractiveServer
+<PageTitle>Accounts · ProjectPulse</PageTitle>
+<div class="page-heading"><div><span class="eyebrow">Portfolio</span><h1>Accounts</h1><p>Every client practice and its delivery context.</p></div><a class="primary-button" href="accounts/new">＋ New account</a></div>
+<section class="surface"><div class="section-head"><input class="input search-input" placeholder="Search accounts…" @bind="search" @bind:event="oninput" /><button class="secondary-button" @onclick="Load">Search</button></div><div class="card-grid">@foreach (var account in accounts) { <a class="entity-card" href="accounts/@account.Id"><div><span class="state-dot @(account.IsActive ? "active" : null)"></span><small>@account.Status</small></div><h2>@account.Name</h2><p>@account.ClientContactName</p><span>@account.ClientContactEmail</span></a> }</div></section>
+@code { private string? search; private List<AccountPractice> accounts = []; protected override async Task OnInitializedAsync() => await Load(); private async Task Load() => accounts = await LeadDesk.GetAccountsAsync(search); }

@@ -1,0 +1,92 @@
+@page "/reports/{Mode}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+<PageTitle>Reports · ProjectPulse</PageTitle>
+
+<div class="page-heading">
+    <div><span class="eyebrow">Operational clarity</span><h1>@Title</h1><p>@Subtitle</p></div>
+    @if (Mode == "standup") { <button class="secondary-button print-button" onclick="window.print()">Print standup</button> }
+</div>
+
+@if (Mode == "accounts")
+{
+    <section class="surface filter-surface">
+        <select class="input search-input" @bind="accountId" @bind:after="Load">
+            <option value="">All accounts</option>
+            @foreach (var account in accounts) { <option value="@account.Id">@account.Name</option> }
+        </select>
+    </section>
+}
+
+@if (Mode == "standup")
+{
+    @foreach (var group in StandupGroups)
+    {
+        <section class="surface standup-group">
+            <div class="standup-member">
+                <span class="large-avatar">@Initial(group.Name)</span>
+                <div><span class="eyebrow">Team member</span><h2>@group.Name</h2></div>
+                <span class="standup-count">@group.Items.Count task@(group.Items.Count == 1 ? "" : "s")</span>
+            </div>
+            <TaskTable Items="group.Items" OnStatusChanged="ChangeStatus" />
+        </section>
+    }
+}
+else
+{
+    <section class="surface"><TaskTable Items="items" OnStatusChanged="ChangeStatus" /></section>
+}
+
+@code {
+    [Parameter] public string Mode { get; set; } = "standup";
+    private long? accountId;
+    private List<AccountPractice> accounts = [];
+    private List<WorkItem> items = [];
+
+    private string Title => Mode switch { "accounts" => "Account progress", "manager" => "Manager summary", _ => "Daily standup" };
+    private string Subtitle => Mode switch { "accounts" => "Review delivery by client account.", "manager" => "A clean view of active delivery and risk.", _ => "Active work grouped by each assigned team member." };
+
+    private IEnumerable<StandupGroup> StandupGroups => items
+        .SelectMany(item => DeveloperNames(item).Select(name => new { Name = name, Item = item }))
+        .GroupBy(x => x.Name)
+        .OrderBy(x => x.Key == "Unassigned" ? 1 : 0)
+        .ThenBy(x => x.Key)
+        .Select(group => new StandupGroup(group.Key, group.Select(x => x.Item).DistinctBy(x => x.Id).ToList()));
+
+    protected override async Task OnParametersSetAsync()
+    {
+        accounts = await LeadDesk.GetAccountsAsync();
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        var query = new TaskQuery
+        {
+            AccountId = Mode == "accounts" ? accountId : null,
+            IncludeArchived = Mode == "accounts",
+            SortBy = Mode == "manager" ? "Priority" : "Workflow"
+        };
+        items = await LeadDesk.GetTasksAsync(query);
+    }
+
+    private async Task ChangeStatus((WorkItem Item, string Status) change)
+    {
+        await LeadDesk.UpdateTaskStatusAsync(change.Item.Id, change.Status);
+        await Load();
+    }
+
+    private static IEnumerable<string> DeveloperNames(WorkItem item)
+    {
+        var names = item.WorkItemDevelopers
+            .Select(x => x.TeamMember.FullName)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct()
+            .ToList();
+        if (names.Count == 0 && item.AssignedDeveloper != null) names.Add(item.AssignedDeveloper.FullName);
+        return names.Count == 0 ? ["Unassigned"] : names;
+    }
+
+    private static string Initial(string name) => name == "Unassigned" ? "?" : name[..1].ToUpperInvariant();
+    private sealed record StandupGroup(string Name, List<WorkItem> Items);
+}

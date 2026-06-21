@@ -1,0 +1,36 @@
+@page "/tasks/new"
+@page "/tasks/{Id:long}/edit"
+@attribute [Authorize]
+@rendermode InteractiveServer
+<PageTitle>@(Id == 0 ? "New task" : "Edit task") · ProjectPulse</PageTitle>
+<div class="page-heading"><div><span class="eyebrow">@(Id == 0 ? "Create" : "Update")</span><h1>@(Id == 0 ? "New task" : "Edit task")</h1><p>Keep the brief focused; link every account and developer involved.</p></div></div>
+<EditForm Model="model" OnValidSubmit="Save" FormName="task-form"><DataAnnotationsValidator /><ValidationSummary />
+<section class="surface form-surface"><div class="form-grid">
+    <div class="field span-2"><label>Title</label><InputText class="input" @bind-Value="model.Title" /><ValidationMessage For="() => model.Title" /></div>
+    <div class="field"><label>Accounts</label><MultiSelect Options="accountOptions" @bind-Selected="model.SelectedAccountIds" Placeholder="Select accounts" SearchPlaceholder="Search accounts…" /></div>
+    <div class="field"><label>Module</label><InputText class="input" @bind-Value="model.ModuleName" /></div>
+    <div class="field"><label>Type</label><InputSelect class="input" @bind-Value="model.Type">@foreach (var x in LeadDeskOptions.Types) { <option>@x</option> }</InputSelect></div>
+    <div class="field"><label>Priority</label><InputSelect class="input" @bind-Value="model.Priority">@foreach (var x in LeadDeskOptions.Priorities) { <option>@x</option> }</InputSelect></div>
+    <div class="field"><label>Status</label><InputSelect class="input" @bind-Value="model.Status">@foreach (var x in LeadDeskOptions.Statuses) { <option>@x</option> }</InputSelect></div>
+    <div class="field span-2"><label>Developers</label><MultiSelect Options="developerOptions" @bind-Selected="model.SelectedDeveloperIds" Placeholder="Select developers" SearchPlaceholder="Search developers…" /></div>
+    <div class="field"><label>QA</label><InputSelect class="input" @bind-Value="model.AssignedQaId"><option value="">Unassigned</option>@foreach (var x in qa) { <option value="@x.Id">@x.FullName</option> }</InputSelect></div>
+    <div class="field"><label>Owner</label><InputSelect class="input" @bind-Value="model.OwnerId"><option value="">Unassigned</option>@foreach (var x in owners) { <option value="@x.Id">@x.FullName</option> }</InputSelect></div>
+    <div class="field"><label>Due date</label><InputDate class="input" @bind-Value="model.DueDate" /></div>
+    <div class="field"><label>Release version</label><InputText class="input" @bind-Value="model.ReleaseVersion" /></div>
+    <label class="check field"><InputCheckbox @bind-Value="model.IsClientVisible" /> Client visible</label>
+    <div class="field full"><label>Description</label><InputTextArea class="input textarea" @bind-Value="model.Description" /></div>
+    <div class="field full"><label>Latest update</label><InputTextArea class="input" @bind-Value="model.LatestUpdate" /></div>
+    <div class="field full"><label>Blocker reason</label><InputTextArea class="input" @bind-Value="model.BlockerReason" /></div>
+</div><div class="form-actions"><button class="primary-button" type="submit">Save task</button><a class="secondary-button" href="tasks">Cancel</a></div></section></EditForm>
+@code {
+    [Parameter] public long Id { get; set; }
+    private WorkItem model = new(); private List<LookupOption> accountOptions = []; private List<LookupOption> developerOptions = []; private List<TeamMember> qa = []; private List<TeamMember> owners = [];
+    protected override async Task OnParametersSetAsync()
+    {
+        var accounts = await LeadDesk.GetAccountsAsync(); var members = await LeadDesk.GetTeamAsync(true);
+        accountOptions = accounts.Select(x => new LookupOption(x.Id, x.Name)).ToList(); developerOptions = members.Where(x => x.Role != "Client").Select(x => new LookupOption(x.Id, x.FullName)).ToList();
+        qa = members.Where(x => x.Role == "QA").ToList(); owners = members.Where(x => x.Role is "Project Lead" or "Manager" or "Client").ToList();
+        model = Id == 0 ? new WorkItem { Status = "New", Priority = "Medium", Type = "Requirement", AssignedQaId = qa.FirstOrDefault()?.Id, OwnerId = owners.FirstOrDefault(x => x.Role == "Project Lead")?.Id } : await LeadDesk.GetTaskAsync(Id) ?? new WorkItem();
+    }
+    private async Task Save() { var id = await LeadDesk.SaveTaskAsync(model); Navigation.NavigateTo($"tasks/{id}"); }
+}

@@ -6,6 +6,13 @@
 @using static Microsoft.AspNetCore.Components.Web.RenderMode
 @using Microsoft.AspNetCore.Components.Web.Virtualization
 @using Microsoft.JSInterop
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
 @using ProjectPulse
 @using ProjectPulse.Components
 @using ProjectPulse.Components.Layout
+@using ProjectPulse.Application
+@using ProjectPulse.Domain
+@using ProjectPulse.Components.Shared
+@inject ILeadDeskService LeadDesk
+@inject NavigationManager Navigation

@@ -1,0 +1,6 @@
+@page "/accounts/{Id:long}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+<PageTitle>Account · ProjectPulse</PageTitle>
+@if (account == null) { <div class="loading">Loading account…</div> } else { <div class="page-heading"><div><span class="eyebrow">@account.Status</span><h1>@account.Name</h1><p>@account.ClientContactName · @account.ClientContactEmail</p></div><a class="secondary-button" href="accounts/@Id/edit">✎ Edit</a></div><section class="surface prose"><h2>Account notes</h2><p>@(account.Notes ?? "No notes added.")</p></section><section class="surface"><div class="section-head"><h2>Linked tasks</h2><a href="tasks/new">Add task →</a></div><TaskTable Items="tasks" OnStatusChanged="ChangeStatus" /></section> }
+@code { [Parameter] public long Id { get; set; } private AccountPractice? account; private List<WorkItem> tasks = []; protected override async Task OnParametersSetAsync() { account = await LeadDesk.GetAccountAsync(Id); tasks = await LeadDesk.GetTasksAsync(new TaskQuery { AccountId = Id, IncludeArchived = true }); } private async Task ChangeStatus((WorkItem Item, string Status) x) => await LeadDesk.UpdateTaskStatusAsync(x.Item.Id, x.Status); }

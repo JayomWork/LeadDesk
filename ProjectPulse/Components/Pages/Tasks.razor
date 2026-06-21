@@ -1,0 +1,22 @@
+@page "/tasks"
+@attribute [Authorize]
+@rendermode InteractiveServer
+<PageTitle>Tasks · ProjectPulse</PageTitle>
+<div class="page-heading"><div><span class="eyebrow">Delivery board</span><h1>Tasks</h1><p>Plan, assign and move work without leaving the list.</p></div><a class="primary-button" href="tasks/new">＋ New task</a></div>
+<section class="surface filter-surface"><div class="filter-grid">
+    <input class="input" placeholder="Search tasks, updates…" @bind="query.Search" @bind:event="oninput" />
+    <select class="input" @bind="query.AccountId"><option value="">All accounts</option>@foreach (var x in accounts) { <option value="@x.Id">@x.Name</option> }</select>
+    <select class="input" @bind="query.DeveloperId"><option value="">All developers</option>@foreach (var x in team) { <option value="@x.Id">@x.FullName</option> }</select>
+    <select class="input" @bind="query.Status"><option value="">All statuses</option>@foreach (var x in LeadDeskOptions.Statuses) { <option>@x</option> }</select>
+    <select class="input" @bind="query.Priority"><option value="">All priorities</option>@foreach (var x in LeadDeskOptions.Priorities) { <option>@x</option> }</select>
+    <select class="input" @bind="query.SortBy"><option value="Workflow">Workflow order</option><option>Newest</option><option>Oldest</option><option>Priority</option><option>Title</option></select>
+    <label class="check"><input type="checkbox" @bind="query.IncludeArchived" /> Include archived</label>
+    <button class="secondary-button" @onclick="Load">Apply filters</button>
+</div></section>
+<section class="surface"><TaskTable Items="items" OnStatusChanged="ChangeStatus" /></section>
+@code {
+    private readonly TaskQuery query = new(); private List<WorkItem> items = []; private List<AccountPractice> accounts = []; private List<TeamMember> team = [];
+    protected override async Task OnInitializedAsync() { accounts = await LeadDesk.GetAccountsAsync(); team = await LeadDesk.GetTeamAsync(true); await Load(); }
+    private async Task Load() => items = await LeadDesk.GetTasksAsync(query);
+    private async Task ChangeStatus((WorkItem Item, string Status) change) { await LeadDesk.UpdateTaskStatusAsync(change.Item.Id, change.Status); await Load(); }
+}

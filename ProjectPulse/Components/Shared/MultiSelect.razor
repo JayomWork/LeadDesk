@@ -1,0 +1,41 @@
+<div class="multi-select @(open ? "open" : null)">
+    <button type="button" class="multi-select-trigger" @onclick="Toggle">
+        <span class="multi-select-value">
+            @if (Selected.Count == 0) { <span class="placeholder">@Placeholder</span> }
+            else
+            {
+                @foreach (var item in SelectedOptions.Take(2)) { <span class="selection-chip">@item.Label</span> }
+                @if (Selected.Count > 2) { <span class="selection-chip muted">+@(Selected.Count - 2) more</span> }
+            }
+        </span><span>⌄</span>
+    </button>
+    @if (open)
+    {
+        <div class="multi-select-menu">
+            <input class="input compact" placeholder="@SearchPlaceholder" @bind="search" @bind:event="oninput" />
+            <div class="multi-actions"><button type="button" @onclick="SelectVisible">Select all</button><button type="button" @onclick="Clear">Clear</button></div>
+            <div class="multi-options">
+                @foreach (var option in VisibleOptions)
+                {
+                    <label class="multi-option @(Selected.Contains(option.Id) ? "selected" : null)"><input type="checkbox" checked="@Selected.Contains(option.Id)" @onchange="e => Change(option.Id, (bool)e.Value!)" /><span>@option.Label</span></label>
+                }
+                @if (!VisibleOptions.Any()) { <div class="empty-note">No matching options</div> }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<LookupOption> Options { get; set; } = [];
+    [Parameter] public List<long> Selected { get; set; } = [];
+    [Parameter] public EventCallback<List<long>> SelectedChanged { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "Select options";
+    [Parameter] public string SearchPlaceholder { get; set; } = "Search...";
+    private bool open; private string search = string.Empty;
+    private IEnumerable<LookupOption> VisibleOptions => Options.Where(x => string.IsNullOrWhiteSpace(search) || x.Label.Contains(search, StringComparison.OrdinalIgnoreCase));
+    private IEnumerable<LookupOption> SelectedOptions => Options.Where(x => Selected.Contains(x.Id));
+    private void Toggle() => open = !open;
+    private async Task Change(long id, bool chosen) { var copy = Selected.ToList(); if (chosen && !copy.Contains(id)) copy.Add(id); if (!chosen) copy.Remove(id); Selected = copy; await SelectedChanged.InvokeAsync(copy); }
+    private async Task Clear() { Selected = []; await SelectedChanged.InvokeAsync(Selected); }
+    private async Task SelectVisible() { Selected = Selected.Concat(VisibleOptions.Select(x => x.Id)).Distinct().ToList(); await SelectedChanged.InvokeAsync(Selected); }
+}

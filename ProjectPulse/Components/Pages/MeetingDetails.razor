@@ -1,0 +1,6 @@
+@page "/meetings/{Id:long}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+<PageTitle>Meeting details · ProjectPulse</PageTitle>
+@if (meeting == null) { <div class="loading">Loading meeting…</div> } else { <div class="page-heading"><div><span class="eyebrow">@meeting.MeetingType · @meeting.MeetingDate.ToString("dd MMM yyyy, hh:mm tt")</span><h1>@meeting.Title</h1><p>@meeting.AccountPractice?.Name · @meeting.Attendees</p></div><a class="secondary-button" href="meetings/@Id/edit">✎ Edit</a></div><div class="detail-grid"><section class="surface prose"><h2>Discussion</h2><p class="preline">@meeting.DiscussionSummary</p><h2>Decisions</h2><p class="preline">@meeting.Decisions</p><h2>Next steps</h2><p class="preline">@meeting.NextSteps</p></section><aside class="surface"><h2>Linked tasks</h2>@foreach (var link in meeting.MeetingWorkItems) { <a class="linked-item" href="tasks/@link.WorkItemId">@link.WorkItem.Title<span>@link.WorkItem.Status</span></a> }</aside></div> }
+@code { [Parameter] public long Id { get; set; } private Meeting? meeting; protected override async Task OnParametersSetAsync() => meeting = await LeadDesk.GetMeetingAsync(Id); }

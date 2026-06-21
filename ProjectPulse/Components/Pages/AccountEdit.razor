@@ -1,0 +1,9 @@
+@page "/accounts/new"
+@page "/accounts/{Id:long}/edit"
+@attribute [Authorize]
+@rendermode InteractiveServer
+<PageTitle>@(Id == 0 ? "New account" : "Edit account") · ProjectPulse</PageTitle>
+<div class="page-heading"><div><span class="eyebrow">Account profile</span><h1>@(Id == 0 ? "New account" : "Edit account")</h1></div></div>
+<EditForm Model="model" OnValidSubmit="Save" FormName="account-form"><DataAnnotationsValidator /><ValidationSummary /><section class="surface form-surface"><div class="form-grid">
+<div class="field span-2"><label>Name</label><InputText class="input" @bind-Value="model.Name" /></div><div class="field"><label>Status</label><InputSelect class="input" @bind-Value="model.Status"><option>Active</option><option>Onboarding</option><option>On Hold</option><option>Inactive</option></InputSelect></div><div class="field"><label>Go-live date</label><InputDate class="input" @bind-Value="model.GoLiveDate" /></div><div class="field"><label>Client contact</label><InputText class="input" @bind-Value="model.ClientContactName" /></div><div class="field"><label>Contact email</label><InputText class="input" @bind-Value="model.ClientContactEmail" /></div><label class="check field"><InputCheckbox @bind-Value="model.IsActive" /> Active account</label><div class="field full"><label>Notes</label><InputTextArea class="input textarea" @bind-Value="model.Notes" /></div></div><div class="form-actions"><button class="primary-button">Save account</button><a class="secondary-button" href="accounts">Cancel</a></div></section></EditForm>
+@code { [Parameter] public long Id { get; set; } private AccountPractice model = new(); protected override async Task OnParametersSetAsync() => model = Id == 0 ? new AccountPractice() : await LeadDesk.GetAccountAsync(Id) ?? new(); private async Task Save() { var id = await LeadDesk.SaveAccountAsync(model); Navigation.NavigateTo($"accounts/{id}"); } }

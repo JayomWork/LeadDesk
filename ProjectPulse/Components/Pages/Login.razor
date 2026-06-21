@@ -1,0 +1,6 @@
+@page "/login"
+@attribute [AllowAnonymous]
+@layout ProjectPulse.Components.Layout.LoginLayout
+<PageTitle>Sign in · ProjectPulse</PageTitle>
+<div class="login-shell"><div class="login-brand"><span class="brand-mark">P</span><div><strong>ProjectPulse</strong><small>Lead Desk</small></div></div><div class="login-card"><span class="eyebrow">Welcome back</span><h1>Sign in to your workspace</h1><p>Use your existing LeadDesk account.</p>@if (Error == "1") { <div class="login-error">Email or password is incorrect.</div> }<form method="post" action="/auth/login"><label>Email</label><input class="input" type="email" name="email" autocomplete="username" required /><label>Password</label><input class="input" type="password" name="password" autocomplete="current-password" required /><button class="primary-button login-button" type="submit">Sign in</button></form></div></div>
+@code { [SupplyParameterFromQuery(Name="error")] public string? Error { get; set; } }
