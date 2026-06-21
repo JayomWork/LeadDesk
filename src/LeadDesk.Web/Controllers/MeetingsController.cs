@@ -20,6 +20,11 @@ public class MeetingsController : Controller
         var meeting = await _context.Meetings
             .Include(x => x.AccountPractice)
             .Include(x => x.MeetingWorkItems).ThenInclude(x => x.WorkItem)
+            .ThenInclude(x => x.WorkItemAccounts).ThenInclude(x => x.AccountPractice)
+            .Include(x => x.MeetingWorkItems).ThenInclude(x => x.WorkItem)
+            .ThenInclude(x => x.WorkItemDevelopers).ThenInclude(x => x.TeamMember)
+            .Include(x => x.MeetingWorkItems).ThenInclude(x => x.WorkItem).ThenInclude(x => x.AccountPractice)
+            .Include(x => x.MeetingWorkItems).ThenInclude(x => x.WorkItem).ThenInclude(x => x.AssignedDeveloper)
             .FirstOrDefaultAsync(x => x.Id == id);
         return meeting == null ? NotFound() : View(meeting);
     }

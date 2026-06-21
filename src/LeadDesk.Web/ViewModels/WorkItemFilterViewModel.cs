@@ -11,6 +11,7 @@ public class WorkItemFilterViewModel
     public long? AccountPracticeId { get; set; }
     public long? AssignedDeveloperId { get; set; }
     public bool IncludeCompleted { get; set; }
+    public string SortBy { get; set; } = "Workflow";
     public List<WorkItem> Items { get; set; } = [];
     public SelectList? Accounts { get; set; }
     public SelectList? TeamMembers { get; set; }

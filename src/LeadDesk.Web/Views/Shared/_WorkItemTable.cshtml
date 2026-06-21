@@ -21,16 +21,30 @@
     <tbody>
     @foreach (var item in Model)
     {
-        var developerName = item.AssignedDeveloper?.FullName;
-        <tr>
+        var developers = item.WorkItemDevelopers.Select(x => x.TeamMember).Where(x => x != null).ToList();
+        var accounts = item.WorkItemAccounts.Select(x => x.AccountPractice).Where(x => x != null).ToList();
+        if (developers.Count == 0 && item.AssignedDeveloper != null) developers.Add(item.AssignedDeveloper);
+        if (accounts.Count == 0 && item.AccountPractice != null) accounts.Add(item.AccountPractice);
+        var rowClass = item.Status == "Released" ? "task-row-released" : item.Status == "Ready for Release" ? "task-row-ready-release" : item.Status == "Completed" ? "task-row-completed" : "";
+        <tr class="@rowClass" data-task-row="@item.Id">
             <td><a asp-controller="WorkItems" asp-action="Details" asp-route-id="@item.Id" class="fw-semibold">@item.Title</a><div class="small text-muted">@item.ModuleName / @item.Type</div></td>
-            <td>@item.AccountPractice?.Name</td>
-            <td><span class="badge status-badge status-@BadgeKey(item.Status)">@item.Status</span></td>
+            <td>@string.Join(", ", accounts.Select(x => x.Name))</td>
+            <td>
+                <form asp-controller="WorkItems" asp-action="UpdateStatus" method="post" class="quick-status-form">
+                    <input type="hidden" name="id" value="@item.Id" />
+                    <select name="status" class="form-select form-select-sm quick-status" aria-label="Update task status">
+                        @foreach (var status in new[] { "New", "Analysis", "Ready for Dev", "In Dev", "Dev Done", "Ready for QA", "In QA", "QA Done", "QA Failed", "Ready for UAT", "Ready for Release", "Released", "Completed", "Blocked", "On Hold", "Cancelled" })
+                        {
+                            <option value="@status" selected="@(status == item.Status)">@status</option>
+                        }
+                    </select>
+                </form>
+            </td>
             <td><span class="priority priority-pill priority-@BadgeKey(item.Priority)">@item.Priority</span></td>
             <td>
-                @if (!string.IsNullOrWhiteSpace(developerName))
+                @if (developers.Count > 0)
                 {
-                    <span class="member-chip"><span class="member-avatar @AvatarClass(developerName)">@Initial(developerName)</span><span>@developerName</span></span>
+                    <div class="d-flex flex-wrap gap-1">@foreach (var developer in developers) { <span class="member-chip"><span class="member-avatar @AvatarClass(developer.FullName)">@Initial(developer.FullName)</span><span>@developer.FullName</span></span> }</div>
                 }
                 else
                 {
@@ -40,10 +54,14 @@
             <td>@item.DueDate?.ToString("dd MMM")</td>
             <td>
                 <div class="d-flex justify-content-end gap-1">
-                    @if (item.Status != "Released" && item.Status != "Cancelled")
+                    @if (item.Status is "Dev Done" or "Ready for QA" or "In QA" or "QA Done")
+                    {
+                        <button class="btn btn-light btn-sm text-primary set-task-status" type="button" data-status="Ready for Release" title="Mark ready for release"><i class="bi bi-rocket-takeoff"></i></button>
+                    }
+                    @if (item.Status == "Released")
                     {
                         <form asp-controller="WorkItems" asp-action="Complete" asp-route-id="@item.Id" method="post">
-                            <button class="btn btn-light btn-sm" type="submit" title="Complete task"><i class="bi bi-check2"></i></button>
+                            <button class="btn btn-light btn-sm" type="submit" title="Complete and archive"><i class="bi bi-archive"></i></button>
                         </form>
                     }
                     @if (User.IsInRole("Admin") || User.IsInRole("ProjectLead") || User.IsInRole("Manager"))
@@ -59,3 +77,29 @@
     </tbody>
 </table>
 </div>
+<script>
+document.addEventListener('change', async function (event) {
+    if (!event.target.classList.contains('quick-status')) return;
+    const select = event.target;
+    const form = select.closest('form');
+    select.disabled = true;
+    try {
+        const response = await fetch(form.action, { method: 'POST', body: new FormData(form), headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        if (!response.ok) throw new Error('Status update failed');
+        const row = select.closest('[data-task-row]');
+        row.classList.remove('task-row-released', 'task-row-ready-release', 'task-row-completed');
+        if (select.value === 'Released') row.classList.add('task-row-released');
+        if (select.value === 'Ready for Release') row.classList.add('task-row-ready-release');
+        if (select.value === 'Completed') row.classList.add('task-row-completed');
+    } catch (error) {
+        alert('Could not update task status. Please try again.');
+    } finally { select.disabled = false; }
+});
+document.addEventListener('click', function (event) {
+    const button = event.target.closest('.set-task-status');
+    if (!button) return;
+    const select = button.closest('[data-task-row]').querySelector('.quick-status');
+    select.value = button.dataset.status;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+});
+</script>

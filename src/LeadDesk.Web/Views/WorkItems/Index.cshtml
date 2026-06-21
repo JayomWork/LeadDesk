@@ -6,9 +6,10 @@
     <div class="col-md-2"><input asp-for="Search" class="form-control" placeholder="Search title/description" /></div>
     <div class="col-md-2"><select asp-for="AccountPracticeId" asp-items="Model.Accounts" class="form-select"><option value="">All Accounts</option></select></div>
     <div class="col-md-2"><select asp-for="AssignedDeveloperId" asp-items="Model.TeamMembers" class="form-select"><option value="">All Team</option></select></div>
-    <div class="col-md-2"><select asp-for="Status" class="form-select"><option value="">All Status</option><option>New</option><option>Analysis</option><option>In Dev</option><option>Ready for QA</option><option>In QA</option><option>Released</option><option>Blocked</option></select></div>
+    <div class="col-md-2"><select asp-for="Status" class="form-select"><option value="">All Status</option><option>New</option><option>Analysis</option><option>Ready for Dev</option><option>In Dev</option><option>Dev Done</option><option>Ready for QA</option><option>In QA</option><option>QA Done</option><option>Ready for Release</option><option>Released</option><option>Completed</option><option>Blocked</option><option>On Hold</option><option>Cancelled</option></select></div>
     <div class="col-md-2"><select asp-for="Priority" class="form-select"><option value="">All Priority</option><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select></div>
-    <div class="col-md-1 d-flex align-items-center"><div class="form-check"><input asp-for="IncludeCompleted" class="form-check-input" /><label asp-for="IncludeCompleted" class="form-check-label">All</label></div></div>
+    <div class="col-md-2"><select asp-for="SortBy" class="form-select"><option value="Workflow">Workflow order</option><option value="Newest">Newest first</option><option value="Oldest">Oldest first</option><option value="Priority">Priority</option><option value="Title">Title</option></select></div>
+    <div class="col-md-1 d-flex align-items-center"><div class="form-check"><input asp-for="IncludeCompleted" class="form-check-input" /><label asp-for="IncludeCompleted" class="form-check-label">Archived</label></div></div>
     <div class="col-md-1"><button class="btn btn-outline-primary w-100"><i class="bi bi-funnel"></i>Go</button></div>
 </form>
 <partial name="_WorkItemTable" model="Model.Items" />

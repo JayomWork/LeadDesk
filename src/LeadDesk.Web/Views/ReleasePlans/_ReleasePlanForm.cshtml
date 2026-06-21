@@ -1,0 +1,16 @@
+@model ReleasePlan
+<div class="panel form-panel">
+<form method="post">
+    <input type="hidden" asp-for="Id" /><input type="hidden" asp-for="Uuid" /><input type="hidden" asp-for="CreatedAt" />
+    <div class="row g-3">
+        <div class="col-md-4"><label asp-for="Version" class="form-label"></label><input asp-for="Version" class="form-control" /><span asp-validation-for="Version" class="text-danger"></span></div>
+        <div class="col-md-4"><label asp-for="Status" class="form-label"></label><select asp-for="Status" class="form-select"><option>Planned</option><option>In QA</option><option>Ready for Release</option><option>Released</option><option>Rollback Needed</option></select></div>
+        <div class="col-md-4"><label asp-for="ReleaseDate" class="form-label"></label><input asp-for="ReleaseDate" type="date" class="form-control" /></div>
+        <div class="col-12"><label asp-for="SelectedWorkItemIds" class="form-label">Tasks in this release</label><select asp-for="SelectedWorkItemIds" asp-items="ViewBag.EligibleTasks" class="native-multi-select" multiple data-multi-select data-placeholder="Select release tasks" data-search-placeholder="Search eligible tasks..."></select><div class="form-text">Eligible Dev Done, QA, and Ready for Release tasks are listed here.</div></div>
+        <div class="col-12"><label asp-for="ReleaseNotes" class="form-label"></label><textarea asp-for="ReleaseNotes" rows="5" class="form-control"></textarea></div>
+        <div class="col-md-3 form-check ms-2"><input asp-for="QaSignedOff" class="form-check-input" /><label asp-for="QaSignedOff" class="form-check-label"></label></div>
+        <div class="col-md-3 form-check"><input asp-for="ClientSignedOff" class="form-check-input" /><label asp-for="ClientSignedOff" class="form-check-label"></label></div>
+        <div class="col-12"><button class="btn btn-primary">Save Release Queue</button><a asp-action="Index" class="btn btn-light">Cancel</a></div>
+    </div>
+</form>
+</div>

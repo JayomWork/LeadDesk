@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LeadDesk.Web.Models;
 
@@ -20,4 +21,7 @@ public class ReleasePlan
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public ICollection<ReleaseWorkItem> ReleaseWorkItems { get; set; } = new List<ReleaseWorkItem>();
+
+    [NotMapped]
+    public List<long> SelectedWorkItemIds { get; set; } = [];
 }

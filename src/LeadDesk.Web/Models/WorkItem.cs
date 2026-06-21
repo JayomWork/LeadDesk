@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace LeadDesk.Web.Models;
 
@@ -53,4 +54,12 @@ public class WorkItem
     public ICollection<WorkItemAttachment> Attachments { get; set; } = new List<WorkItemAttachment>();
     public ICollection<MeetingWorkItem> MeetingWorkItems { get; set; } = new List<MeetingWorkItem>();
     public ICollection<ReleaseWorkItem> ReleaseWorkItems { get; set; } = new List<ReleaseWorkItem>();
+    public ICollection<WorkItemDeveloper> WorkItemDevelopers { get; set; } = new List<WorkItemDeveloper>();
+    public ICollection<WorkItemAccount> WorkItemAccounts { get; set; } = new List<WorkItemAccount>();
+
+    [NotMapped]
+    public List<long> SelectedDeveloperIds { get; set; } = [];
+
+    [NotMapped]
+    public List<long> SelectedAccountIds { get; set; } = [];
 }

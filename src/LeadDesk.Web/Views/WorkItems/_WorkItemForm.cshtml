@@ -4,12 +4,12 @@
 <input type="hidden" asp-for="Id" /><input type="hidden" asp-for="Uuid" /><input type="hidden" asp-for="CreatedAt" />
 <div class="row g-3">
     <div class="col-md-8"><label asp-for="Title" class="form-label"></label><input asp-for="Title" class="form-control" /><span asp-validation-for="Title" class="text-danger"></span></div>
-    <div class="col-md-4"><label asp-for="AccountPracticeId" class="form-label">Account</label><select asp-for="AccountPracticeId" asp-items="ViewBag.Accounts" class="form-select"><option value="">No Account</option></select></div>
+    <div class="col-md-4"><label asp-for="SelectedAccountIds" class="form-label">Accounts</label><select asp-for="SelectedAccountIds" asp-items="ViewBag.Accounts" class="native-multi-select" multiple data-multi-select data-placeholder="Select accounts" data-search-placeholder="Search accounts..."></select><div class="form-text">Select one or more accounts.</div></div>
     <div class="col-md-3"><label asp-for="ModuleName" class="form-label"></label><input asp-for="ModuleName" class="form-control" placeholder="Scheduler / Claims / Notes" /></div>
     <div class="col-md-3"><label asp-for="Type" class="form-label"></label><select asp-for="Type" asp-items="ViewBag.Types" class="form-select"></select></div>
     <div class="col-md-3"><label asp-for="Priority" class="form-label"></label><select asp-for="Priority" asp-items="ViewBag.Priorities" class="form-select"></select></div>
     <div class="col-md-3"><label asp-for="Status" class="form-label"></label><select asp-for="Status" asp-items="ViewBag.Statuses" class="form-select"></select></div>
-    <div class="col-md-4"><label asp-for="AssignedDeveloperId" class="form-label">Developer</label><select asp-for="AssignedDeveloperId" asp-items="ViewBag.DeveloperMembers" class="form-select"><option value="">Unassigned</option></select></div>
+    <div class="col-md-4"><label asp-for="SelectedDeveloperIds" class="form-label">Developers</label><select asp-for="SelectedDeveloperIds" asp-items="ViewBag.DeveloperMembers" class="native-multi-select" multiple data-multi-select data-placeholder="Select developers" data-search-placeholder="Search developers..."></select><div class="form-text">Choose everyone working on this task.</div></div>
     <div class="col-md-4"><label asp-for="AssignedQaId" class="form-label">QA</label><select asp-for="AssignedQaId" asp-items="ViewBag.QaMembers" class="form-select"><option value="">Unassigned</option></select></div>
     <div class="col-md-4"><label asp-for="OwnerId" class="form-label">Owner</label><select asp-for="OwnerId" asp-items="ViewBag.OwnerMembers" class="form-select"><option value="">Unassigned</option></select></div>
     <div class="col-md-4"><label asp-for="DueDate" class="form-label"></label><input asp-for="DueDate" type="date" class="form-control" /></div>

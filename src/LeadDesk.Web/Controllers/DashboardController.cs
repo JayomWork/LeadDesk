@@ -24,8 +24,8 @@ public class DashboardController : Controller
             Blocked = await _context.WorkItems.CountAsync(x => x.Status == "Blocked"),
             DueThisWeek = await _context.WorkItems.CountAsync(x => x.DueDate != null && x.DueDate <= weekEnd && x.Status != "Released"),
             ReleasedThisMonth = await _context.WorkItems.CountAsync(x => x.Status == "Released" && x.UpdatedAt != null && x.UpdatedAt.Value.Month == now.Month),
-            RecentItems = await _context.WorkItems.Include(x => x.AccountPractice).OrderByDescending(x => x.UpdatedAt ?? x.CreatedAt).Take(8).ToListAsync(),
-            BlockedItems = await _context.WorkItems.Include(x => x.AccountPractice).Where(x => x.Status == "Blocked").Take(8).ToListAsync()
+            RecentItems = await _context.WorkItems.Include(x => x.AccountPractice).Include(x => x.AssignedDeveloper).Include(x => x.WorkItemAccounts).ThenInclude(x => x.AccountPractice).Include(x => x.WorkItemDevelopers).ThenInclude(x => x.TeamMember).OrderByDescending(x => x.UpdatedAt ?? x.CreatedAt).Take(8).ToListAsync(),
+            BlockedItems = await _context.WorkItems.Include(x => x.AccountPractice).Include(x => x.AssignedDeveloper).Include(x => x.WorkItemAccounts).ThenInclude(x => x.AccountPractice).Include(x => x.WorkItemDevelopers).ThenInclude(x => x.TeamMember).Where(x => x.Status == "Blocked").Take(8).ToListAsync()
         };
         return View(vm);
     }

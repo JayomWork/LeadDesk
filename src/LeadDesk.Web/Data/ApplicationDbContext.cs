@@ -17,6 +17,8 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     public DbSet<MeetingWorkItem> MeetingWorkItems => Set<MeetingWorkItem>();
     public DbSet<ReleasePlan> ReleasePlans => Set<ReleasePlan>();
     public DbSet<ReleaseWorkItem> ReleaseWorkItems => Set<ReleaseWorkItem>();
+    public DbSet<WorkItemDeveloper> WorkItemDevelopers => Set<WorkItemDeveloper>();
+    public DbSet<WorkItemAccount> WorkItemAccounts => Set<WorkItemAccount>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -61,5 +63,21 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
         builder.Entity<ReleaseWorkItem>()
             .HasIndex(x => new { x.ReleasePlanId, x.WorkItemId })
             .IsUnique();
+
+        builder.Entity<WorkItemDeveloper>().HasKey(x => new { x.WorkItemId, x.TeamMemberId });
+        builder.Entity<WorkItemDeveloper>()
+            .HasOne(x => x.WorkItem).WithMany(x => x.WorkItemDevelopers)
+            .HasForeignKey(x => x.WorkItemId).OnDelete(DeleteBehavior.Cascade);
+        builder.Entity<WorkItemDeveloper>()
+            .HasOne(x => x.TeamMember).WithMany()
+            .HasForeignKey(x => x.TeamMemberId).OnDelete(DeleteBehavior.Restrict);
+
+        builder.Entity<WorkItemAccount>().HasKey(x => new { x.WorkItemId, x.AccountPracticeId });
+        builder.Entity<WorkItemAccount>()
+            .HasOne(x => x.WorkItem).WithMany(x => x.WorkItemAccounts)
+            .HasForeignKey(x => x.WorkItemId).OnDelete(DeleteBehavior.Cascade);
+        builder.Entity<WorkItemAccount>()
+            .HasOne(x => x.AccountPractice).WithMany()
+            .HasForeignKey(x => x.AccountPracticeId).OnDelete(DeleteBehavior.Restrict);
     }
 }

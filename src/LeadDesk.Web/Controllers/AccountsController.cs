@@ -22,9 +22,16 @@ public class AccountsController : Controller
 
     public async Task<IActionResult> Details(long id)
     {
-        var account = await _context.AccountPractices
-            .Include(x => x.WorkItems)
-            .FirstOrDefaultAsync(x => x.Id == id);
+        var account = await _context.AccountPractices.FirstOrDefaultAsync(x => x.Id == id);
+        if (account != null)
+        {
+            ViewBag.WorkItems = await _context.WorkItems
+                .Include(x => x.AccountPractice).Include(x => x.AssignedDeveloper)
+                .Include(x => x.WorkItemAccounts).ThenInclude(x => x.AccountPractice)
+                .Include(x => x.WorkItemDevelopers).ThenInclude(x => x.TeamMember)
+                .Where(x => x.AccountPracticeId == id || x.WorkItemAccounts.Any(a => a.AccountPracticeId == id))
+                .OrderByDescending(x => x.CreatedAt).ToListAsync();
+        }
         return account == null ? NotFound() : View(account);
     }
 
