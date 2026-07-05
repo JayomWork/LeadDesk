@@ -1,0 +1,92 @@
+@if (IsOpen && Member != null)
+{
+    <div class="modal-backdrop">
+        <div class="quick-task-modal">
+            <div class="modal-head">
+                <div><span class="eyebrow">Quick assignment</span><h2>Add quick task</h2></div>
+                <button type="button" class="icon-button" title="Close" @onclick="Cancel">x</button>
+            </div>
+            <p class="modal-context">Assigning to <strong>@Member.Member.FullName</strong></p>
+
+            <EditForm Model="model" OnValidSubmit="Save" FormName="quick-team-task-form">
+                <DataAnnotationsValidator />
+                @if (!string.IsNullOrWhiteSpace(errorMessage))
+                {
+                    <div class="form-error">@errorMessage</div>
+                }
+                <div class="quick-task-grid">
+                    <div class="field full"><label>Title</label><InputText class="input" required @bind-Value="model.Title" placeholder="Enter task title..." /></div>
+                    <div class="field"><label>Account</label><InputSelect class="input select-input" @bind-Value="selectedAccountId"><option value="">All accounts</option>@foreach (var account in Accounts) { <option value="@account.Id">@account.Name</option> }</InputSelect></div>
+                    <div class="field"><label>Priority</label><InputSelect class="input select-input" @bind-Value="model.Priority">@foreach (var priority in LeadDeskOptions.Priorities) { <option>@priority</option> }</InputSelect></div>
+                    <div class="field"><label>Due date</label><InputDate class="input" @bind-Value="model.DueDate" /></div>
+                    <div class="field full"><label>Description optional</label><InputTextArea class="input compact-textarea" @bind-Value="model.Description" placeholder="Add a short note if needed" /></div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="secondary-button" @onclick="Cancel">Cancel</button>
+                    <button type="submit" class="primary-button" disabled="@isSaving">@(isSaving ? "Adding..." : "Add task")</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public TeamMemberTaskSummary? Member { get; set; }
+    [Parameter] public IReadOnlyList<AccountPractice> Accounts { get; set; } = [];
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public EventCallback OnSaved { get; set; }
+
+    private WorkItem model = NewModel();
+    private long? selectedAccountId;
+    private long? lastMemberId;
+    private bool wasOpen;
+    private bool isSaving;
+    private string? errorMessage;
+
+    protected override void OnParametersSet()
+    {
+        if (IsOpen && (!wasOpen || Member?.Member.Id != lastMemberId))
+        {
+            lastMemberId = Member?.Member.Id;
+            selectedAccountId = null;
+            model = NewModel();
+            errorMessage = null;
+        }
+
+        wasOpen = IsOpen;
+    }
+
+    private async Task Save()
+    {
+        if (Member == null) return;
+        try
+        {
+            isSaving = true;
+            errorMessage = null;
+            model.SelectedDeveloperIds = [Member.Member.Id];
+            model.AssignedDeveloperId = Member.Member.Id;
+            model.SelectedAccountIds = selectedAccountId.HasValue ? [selectedAccountId.Value] : [];
+            model.AccountPracticeId = selectedAccountId;
+            await LeadDesk.SaveTaskAsync(model);
+            await OnSaved.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task Cancel() => await OnCancel.InvokeAsync();
+
+    private static WorkItem NewModel() => new()
+    {
+        Type = "Requirement",
+        Priority = "Medium",
+        Status = "New"
+    };
+}

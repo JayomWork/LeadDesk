@@ -1,0 +1,176 @@
+<div class="ai-field">
+    <div class="field-label">
+        <label>@FieldName</label>
+        <span class="ai-assistant">
+            <button type="button" class="ai-trigger @(ShowImproveText ? "with-text" : null)" title="Improve text" disabled="@isLoading" @onclick="ToggleMenu">
+                @if (isLoading)
+                {
+                    <span class="ai-spinner"></span>
+                    @if (ShowImproveText) { <span>Improving...</span> }
+                }
+                else
+                {
+                    <span class="sparkle" aria-hidden="true">&#10024;</span>
+                    @if (ShowImproveText) { <span>Improve</span> }
+                }
+            </button>
+            @if (menuOpen)
+            {
+                <div class="ai-menu">
+                    @foreach (var action in Actions)
+                    {
+                        <button type="button" disabled="@isLoading" @onclick="() => Generate(action)">
+                            @action.Label
+                        </button>
+                    }
+                </div>
+            }
+        </span>
+    </div>
+
+    @ChildContent
+
+    @if (!string.IsNullOrWhiteSpace(message))
+    {
+        <div class="ai-message">@message</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(suggestion))
+    {
+        <div class="ai-suggestion">
+            <div class="ai-suggestion-head">
+                <strong>AI suggestion</strong>
+                <span>@lastActionLabel</span>
+            </div>
+            <div class="ai-suggestion-text">@((MarkupString)FormatSuggestion(suggestion))</div>
+            <div class="ai-suggestion-actions">
+                <button type="button" class="primary-button small" @onclick="Replace">Replace</button>
+                <button type="button" class="secondary-button small" @onclick="Copy">Copy</button>
+                <button type="button" class="secondary-button small" disabled="@isLoading" @onclick="Regenerate">Regenerate</button>
+                <button type="button" class="secondary-button small" @onclick="Dismiss">Dismiss</button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private const int MaxTextLength = 4000;
+    private static readonly IReadOnlyList<AiAction> DefaultActions =
+    [
+        new("FixSpellingGrammar", "Fix spelling and grammar"),
+        new("ReframeProfessionally", "Reframe professionally"),
+        new("MakeClientFriendly", "Make client-friendly"),
+        new("MakeShortClear", "Make short and clear"),
+        new("ConvertToDeveloperTask", "Convert to developer task"),
+        new("ConvertToQATestPoints", "Convert to QA test points"),
+        new("MakeManagerSummary", "Make manager summary")
+    ];
+
+    [Parameter, EditorRequired] public string FieldName { get; set; } = string.Empty;
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public AIWritingTaskContextDto Context { get; set; } = new();
+    [Parameter] public IReadOnlyList<string>? AllowedActions { get; set; }
+    [Parameter] public bool ShowImproveText { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public EventCallback<string> ReplaceText { get; set; }
+    [Parameter] public EventCallback<string> SuggestionGenerated { get; set; }
+
+    [Inject] private IJSRuntime JS { get; set; } = null!;
+
+    private bool menuOpen;
+    private bool isLoading;
+    private string? message;
+    private string? suggestion;
+    private AiAction? lastAction;
+    private string? lastActionLabel;
+
+    private IReadOnlyList<AiAction> Actions => AllowedActions is { Count: > 0 }
+        ? DefaultActions.Where(action => AllowedActions.Contains(action.Key)).ToList()
+        : DefaultActions;
+
+    private void ToggleMenu()
+    {
+        if (isLoading) return;
+        menuOpen = !menuOpen;
+        message = null;
+    }
+
+    private async Task Generate(AiAction action)
+    {
+        message = null;
+        suggestion = null;
+
+        var text = Value?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            message = "Please enter text first.";
+            menuOpen = false;
+            return;
+        }
+
+        if (text.Length > MaxTextLength)
+        {
+            message = $"Text is too long. Please keep it under {MaxTextLength} characters.";
+            menuOpen = false;
+            return;
+        }
+
+        try
+        {
+            isLoading = true;
+            menuOpen = false;
+            lastAction = action;
+            lastActionLabel = action.Label;
+
+            var request = new AIWritingRequestDto
+            {
+                FieldName = FieldName,
+                Action = action.Key,
+                Text = text,
+                TaskContext = Context
+            };
+
+            suggestion = await JS.InvokeAsync<string>("projectPulseAiWriting.improve", "/api/ai-writing/improve", request);
+            await SuggestionGenerated.InvokeAsync(suggestion);
+        }
+        catch (Exception ex)
+        {
+            message = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task Regenerate()
+    {
+        if (lastAction != null) await Generate(lastAction);
+    }
+
+    private async Task Replace()
+    {
+        if (!string.IsNullOrWhiteSpace(suggestion)) await ReplaceText.InvokeAsync(suggestion);
+    }
+
+    private async Task Copy()
+    {
+        if (string.IsNullOrWhiteSpace(suggestion)) return;
+        await JS.InvokeVoidAsync("projectPulseAiWriting.copy", suggestion);
+        message = "Copied suggestion.";
+    }
+
+    private void Dismiss()
+    {
+        suggestion = null;
+        message = null;
+    }
+
+    private static string FormatSuggestion(string value)
+    {
+        var encoded = System.Net.WebUtility.HtmlEncode(value);
+        return encoded.Replace("\r\n", "<br />").Replace("\n", "<br />");
+    }
+
+    private sealed record AiAction(string Key, string Label);
+}

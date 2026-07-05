@@ -1,0 +1,16 @@
+<div class="empty-state">
+    <div class="empty-state-icon" aria-hidden="true"></div>
+    <strong>@Title</strong>
+    <span>@Message</span>
+    @if (!string.IsNullOrWhiteSpace(ActionHref) && !string.IsNullOrWhiteSpace(ActionText))
+    {
+        <a class="secondary-button small empty-state-action" href="@ActionHref">@ActionText</a>
+    }
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "No records found";
+    [Parameter] public string Message { get; set; } = "Create a new record or adjust your filters to see more results.";
+    [Parameter] public string? ActionText { get; set; }
+    [Parameter] public string? ActionHref { get; set; }
+}

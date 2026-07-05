@@ -1,7 +1,179 @@
 @page "/team"
 @attribute [Authorize]
 @rendermode InteractiveServer
-<PageTitle>Team · ProjectPulse</PageTitle>
-<div class="page-heading"><div><span class="eyebrow">People</span><h1>Team</h1><p>The people responsible for delivery and quality.</p></div><a class="primary-button" href="team/new">＋ Add member</a></div>
-<section class="surface"><div class="card-grid">@foreach (var member in members) { <a class="entity-card person-card" href="team/@member.Id/edit"><div class="large-avatar">@Initial(member.FullName)</div><div><span class="role-pill">@member.Role</span><h2>@member.FullName</h2><p>@member.Email</p><small>@(member.IsActive ? "Active" : "Inactive")</small></div></a> }</div></section>
-@code { private List<TeamMember> members = []; protected override async Task OnInitializedAsync() => members = await LeadDesk.GetTeamAsync(); private static string Initial(string x) => string.IsNullOrWhiteSpace(x) ? "?" : x[..1]; }
+<PageTitle>Team - ProjectPulse</PageTitle>
+
+<div class="page-heading">
+    <div>
+        <span class="eyebrow">People</span>
+        <h1>Team</h1>
+        <p>Manage people responsible for delivery and quality.</p>
+    </div>
+    <a class="primary-button" href="team/new">+ Add member</a>
+</div>
+
+@if (isLoading)
+{
+    <div class="loading"><span class="loader"></span>Loading team...</div>
+}
+else
+{
+    <TeamSummaryCards TotalMembers="TotalMembers"
+                      ActiveMembers="ActiveMembers"
+                      Developers="Developers"
+                      QaMembers="QaMembers"
+                      PendingTasks="PendingTasks" />
+
+    <TeamFilterBar Search="search"
+                   SearchChanged="value => search = value"
+                   Role="roleFilter"
+                   RoleChanged="value => roleFilter = value"
+                   Status="statusFilter"
+                   StatusChanged="value => statusFilter = value"
+                   Account="accountFilter"
+                   AccountChanged="value => accountFilter = value"
+                   SortBy="sortBy"
+                   SortByChanged="value => sortBy = value"
+                   Roles="roleOptions"
+                   Accounts="accountOptions" />
+
+    @if (FilteredMembers.Count == 0)
+    {
+        <EmptyState Title="No team members found." Message="Try changing the search or filters." />
+    }
+    else
+    {
+        <section class="team-grid">
+            @foreach (var summary in FilteredMembers)
+            {
+                <TeamMemberCard Summary="summary" OnOpenSummary="OpenSummary" OnViewTasks="OpenTasks" OnAddTask="OpenQuickAdd" />
+            }
+        </section>
+    }
+}
+
+<MemberQuickSummaryDrawer IsOpen="drawerOpen"
+                          Summary="selectedMember"
+                          ShowTaskList="drawerShowsTasks"
+                          OnClose="CloseDrawer"
+                          OnViewTasks="OpenTasks"
+                          OnAddTask="OpenQuickAdd" />
+
+<QuickAddTaskModal IsOpen="quickAddOpen"
+                   Member="quickAddMember"
+                   Accounts="accounts"
+                   OnCancel="CloseQuickAdd"
+                   OnSaved="QuickTaskSaved" />
+
+@code {
+    private List<TeamMemberTaskSummary> summaries = [];
+    private List<AccountPractice> accounts = [];
+    private bool isLoading = true;
+    private string? search;
+    private string? roleFilter;
+    private string? statusFilter;
+    private string? accountFilter;
+    private string sortBy = "MostPending";
+    private bool drawerOpen;
+    private bool drawerShowsTasks;
+    private bool quickAddOpen;
+    private TeamMemberTaskSummary? selectedMember;
+    private TeamMemberTaskSummary? quickAddMember;
+
+    private int TotalMembers => summaries.Count;
+    private int ActiveMembers => summaries.Count(x => x.Member.IsActive);
+    private int Developers => summaries.Count(x => x.Member.Role.Contains("Developer", StringComparison.OrdinalIgnoreCase));
+    private int QaMembers => summaries.Count(x => x.Member.Role == "QA");
+    private int PendingTasks => summaries.Sum(x => x.PendingTaskCount);
+
+    private IReadOnlyList<string> roleOptions => summaries
+        .Select(x => x.Member.Role)
+        .Where(x => !string.IsNullOrWhiteSpace(x))
+        .Distinct()
+        .OrderBy(x => x)
+        .ToList();
+
+    private IReadOnlyList<string> accountOptions => summaries
+        .SelectMany(x => x.AssignedAccounts)
+        .Where(x => !string.IsNullOrWhiteSpace(x))
+        .Distinct()
+        .OrderBy(x => x)
+        .ToList();
+
+    private List<TeamMemberTaskSummary> FilteredMembers
+    {
+        get
+        {
+            IEnumerable<TeamMemberTaskSummary> query = summaries;
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                query = query.Where(x =>
+                    x.Member.FullName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    (!string.IsNullOrWhiteSpace(x.Member.Email) && x.Member.Email.Contains(search, StringComparison.OrdinalIgnoreCase)));
+            }
+
+            if (!string.IsNullOrWhiteSpace(roleFilter)) query = query.Where(x => x.Member.Role == roleFilter);
+            if (statusFilter == "Active") query = query.Where(x => x.Member.IsActive);
+            if (statusFilter == "Inactive") query = query.Where(x => !x.Member.IsActive);
+            if (!string.IsNullOrWhiteSpace(accountFilter)) query = query.Where(x => x.AssignedAccounts.Contains(accountFilter));
+
+            query = sortBy switch
+            {
+                "MostOverdue" => query.OrderByDescending(x => x.OverdueTaskCount).ThenByDescending(x => x.PendingTaskCount),
+                "RecentlyUpdated" => query.OrderByDescending(x => x.LastUpdatedAt),
+                "Name" => query.OrderBy(x => x.Member.FullName),
+                "Role" => query.OrderBy(x => x.Member.Role).ThenBy(x => x.Member.FullName),
+                _ => query.OrderByDescending(x => x.PendingTaskCount).ThenByDescending(x => x.InProgressTaskCount)
+            };
+
+            return query.ToList();
+        }
+    }
+
+    protected override async Task OnInitializedAsync() => await LoadData();
+
+    private async Task LoadData()
+    {
+        isLoading = true;
+        summaries = await LeadDesk.GetTeamTaskSummariesAsync();
+        accounts = await LeadDesk.GetAccountsAsync();
+        SyncSelectedMember();
+        isLoading = false;
+    }
+
+    private void OpenSummary(TeamMemberTaskSummary summary)
+    {
+        selectedMember = summary;
+        drawerShowsTasks = false;
+        drawerOpen = true;
+    }
+
+    private void OpenTasks(TeamMemberTaskSummary summary)
+    {
+        selectedMember = summary;
+        drawerShowsTasks = true;
+        drawerOpen = true;
+    }
+
+    private void OpenQuickAdd(TeamMemberTaskSummary summary)
+    {
+        quickAddMember = summary;
+        quickAddOpen = true;
+    }
+
+    private void CloseDrawer() => drawerOpen = false;
+
+    private void CloseQuickAdd() => quickAddOpen = false;
+
+    private async Task QuickTaskSaved()
+    {
+        quickAddOpen = false;
+        await LoadData();
+    }
+
+    private void SyncSelectedMember()
+    {
+        if (selectedMember != null) selectedMember = summaries.FirstOrDefault(x => x.Member.Id == selectedMember.Member.Id);
+        if (quickAddMember != null) quickAddMember = summaries.FirstOrDefault(x => x.Member.Id == quickAddMember.Member.Id);
+    }
+}

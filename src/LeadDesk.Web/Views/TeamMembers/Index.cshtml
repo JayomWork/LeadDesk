@@ -1,9 +1,0 @@
-@model IEnumerable<TeamMember>
-@{ ViewData["Title"] = "Team"; ViewData["PageTitle"] = "Team Members"; }
-@functions {
-    private static string BadgeKey(string? value) =>
-        string.IsNullOrWhiteSpace(value)
-            ? "unknown"
-            : value.Trim().ToLowerInvariant().Replace(".", "").Replace(" ", "-");
-}
-<div class="panel"><div class="panel-header"><h2><i class="bi bi-people me-2"></i>Team</h2><a asp-action="Create" class="btn btn-primary btn-sm"><i class="bi bi-person-plus"></i>Add Member</a></div><table class="table"><thead><tr><th>Name</th><th>Role</th><th>Email</th><th>Active</th><th></th></tr></thead><tbody>@foreach(var x in Model){<tr><td class="fw-semibold">@x.FullName</td><td><span class="badge role-badge role-@BadgeKey(x.Role)">@x.Role</span></td><td>@x.Email</td><td><span class="badge state-badge @(x.IsActive ? "state-active" : "state-inactive")">@(x.IsActive ? "Active" : "Inactive")</span></td><td class="text-end"><a asp-action="Edit" asp-route-id="@x.Id" class="btn btn-light btn-sm"><i class="bi bi-pencil-square"></i>Edit</a></td></tr>}</tbody></table></div>

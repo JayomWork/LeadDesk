@@ -1,6 +1,71 @@
 @page "/login"
 @attribute [AllowAnonymous]
 @layout ProjectPulse.Components.Layout.LoginLayout
-<PageTitle>Sign in · ProjectPulse</PageTitle>
-<div class="login-shell"><div class="login-brand"><span class="brand-mark">P</span><div><strong>ProjectPulse</strong><small>Lead Desk</small></div></div><div class="login-card"><span class="eyebrow">Welcome back</span><h1>Sign in to your workspace</h1><p>Use your existing LeadDesk account.</p>@if (Error == "1") { <div class="login-error">Email or password is incorrect.</div> }<form method="post" action="/auth/login"><label>Email</label><input class="input" type="email" name="email" autocomplete="username" required /><label>Password</label><input class="input" type="password" name="password" autocomplete="current-password" required /><button class="primary-button login-button" type="submit">Sign in</button></form></div></div>
-@code { [SupplyParameterFromQuery(Name="error")] public string? Error { get; set; } }
+<PageTitle>Sign in - ProjectPulse</PageTitle>
+
+<div class="login-shell">
+    <main class="login-panel">
+        <aside class="login-art-panel" aria-hidden="true">
+            <img class="login-illustration-image" src="images/login-workspace.png" alt="" />
+        </aside>
+
+        <section class="login-card">
+            <div class="login-brand">
+                <span class="brand-mark">P</span>
+                <div><strong>ProjectPulse</strong><small>Lead Desk</small></div>
+            </div>
+            <div class="login-copy">
+                <h1>Sign in to your workspace</h1>
+                <p>Access your tasks, updates, and shared workspace.</p>
+            </div>
+
+            @if (Error == "1")
+            {
+                <div class="login-error">Email or password is incorrect.</div>
+            }
+
+            <form method="post" action="/auth/login" class="login-form">
+                <label for="login-email">Email</label>
+                <div class="login-input-wrap">
+                    <svg class="login-field-icon" aria-hidden="true" viewBox="0 0 24 24">
+                        <rect x="3.5" y="5.5" width="17" height="13" rx="3"></rect>
+                        <path d="m5 8 7 5 7-5"></path>
+                    </svg>
+                    <input id="login-email" class="login-input" type="email" name="email" autocomplete="username" placeholder="Enter your email" required />
+                </div>
+
+                <label for="login-password">Password</label>
+                <div class="login-input-wrap">
+                    <svg class="login-field-icon" aria-hidden="true" viewBox="0 0 24 24">
+                        <rect x="5" y="10" width="14" height="10" rx="2.5"></rect>
+                        <path d="M8 10V7a4 4 0 0 1 8 0v3"></path>
+                        <path d="M12 14v2"></path>
+                    </svg>
+                    <input id="login-password" class="login-input" type="password" name="password" autocomplete="current-password" placeholder="Enter your password" required />
+                    <svg class="login-field-icon login-eye-icon" aria-hidden="true" viewBox="0 0 24 24">
+                        <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z"></path>
+                        <circle cx="12" cy="12" r="2.5"></circle>
+                    </svg>
+                </div>
+
+                <div class="login-options">
+                    <label class="remember-check"><input type="checkbox" name="remember" value="true" checked /> Remember me</label>
+                </div>
+
+                <button class="primary-button login-button" type="submit">Sign in <span aria-hidden="true">-></span></button>
+            </form>
+
+            <p class="login-footer-note">
+                <svg class="secure-access-icon" aria-hidden="true" viewBox="0 0 24 24">
+                    <path d="M12 3.5 18 6v5.2c0 3.8-2.4 7.3-6 8.8-3.6-1.5-6-5-6-8.8V6l6-2.5Z"></path>
+                    <path d="m9.5 12 1.7 1.7 3.4-4"></path>
+                </svg>
+                Secure access
+            </p>
+        </section>
+    </main>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "error")] public string? Error { get; set; }
+}

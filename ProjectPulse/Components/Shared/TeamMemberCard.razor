@@ -1,0 +1,40 @@
+<article class="team-member-card" @onclick="() => OnOpenSummary.InvokeAsync(Summary)">
+    <div class="team-card-head">
+        <div class="team-avatar">@Initial(Summary.Member.FullName)</div>
+        <div class="team-identity">
+            <div class="team-title-row">
+                <h2>@Summary.Member.FullName</h2>
+                <span class="role-pill">@Summary.Member.Role</span>
+            </div>
+            <p>@(string.IsNullOrWhiteSpace(Summary.Member.Email) ? "No email added" : Summary.Member.Email)</p>
+        </div>
+        <span class="health-badge @(Summary.Member.IsActive ? "active" : "inactive")">@(Summary.Member.IsActive ? "Active" : "Inactive")</span>
+    </div>
+
+    <div class="team-task-row">
+        <span><small>Pending</small><strong class="pending-number">@Summary.PendingTaskCount</strong></span>
+        <span><small>In Progress</small><strong class="progress-number">@Summary.InProgressTaskCount</strong></span>
+        <span><small>Completed</small><strong class="complete-number">@Summary.CompletedTaskCount</strong></span>
+        <span class="overdue"><small>Overdue</small><strong>@Summary.OverdueTaskCount</strong></span>
+    </div>
+
+    <div class="team-card-bottom">
+        <div class="team-primary-account"><span></span> Primary Account: <strong>@Summary.PrimaryAccountName</strong></div>
+        <div class="account-progress-ring" style="--progress:@Summary.CompletionPercentage"><span>@Summary.CompletionPercentage%</span></div>
+    </div>
+
+    <div class="team-card-actions">
+        <button type="button" class="secondary-button small" @onclick="() => OnViewTasks.InvokeAsync(Summary)" @onclick:stopPropagation>View tasks</button>
+        <button type="button" class="primary-button small" @onclick="() => OnAddTask.InvokeAsync(Summary)" @onclick:stopPropagation>+ Add task</button>
+        <button type="button" class="icon-button" title="Quick summary" @onclick="() => OnOpenSummary.InvokeAsync(Summary)" @onclick:stopPropagation>i</button>
+    </div>
+</article>
+
+@code {
+    [Parameter, EditorRequired] public TeamMemberTaskSummary Summary { get; set; } = new();
+    [Parameter] public EventCallback<TeamMemberTaskSummary> OnOpenSummary { get; set; }
+    [Parameter] public EventCallback<TeamMemberTaskSummary> OnViewTasks { get; set; }
+    [Parameter] public EventCallback<TeamMemberTaskSummary> OnAddTask { get; set; }
+
+    private static string Initial(string value) => string.IsNullOrWhiteSpace(value) ? "?" : value.Trim()[..1].ToUpperInvariant();
+}

@@ -2,35 +2,163 @@
 @page "/tasks/{Id:long}/edit"
 @attribute [Authorize]
 @rendermode InteractiveServer
-<PageTitle>@(Id == 0 ? "New task" : "Edit task") · ProjectPulse</PageTitle>
-<div class="page-heading"><div><span class="eyebrow">@(Id == 0 ? "Create" : "Update")</span><h1>@(Id == 0 ? "New task" : "Edit task")</h1><p>Keep the brief focused; link every account and developer involved.</p></div></div>
-<EditForm Model="model" OnValidSubmit="Save" FormName="task-form"><DataAnnotationsValidator /><ValidationSummary />
-<section class="surface form-surface"><div class="form-grid">
-    <div class="field span-2"><label>Title</label><InputText class="input" @bind-Value="model.Title" /><ValidationMessage For="() => model.Title" /></div>
-    <div class="field"><label>Accounts</label><MultiSelect Options="accountOptions" @bind-Selected="model.SelectedAccountIds" Placeholder="Select accounts" SearchPlaceholder="Search accounts…" /></div>
-    <div class="field"><label>Module</label><InputText class="input" @bind-Value="model.ModuleName" /></div>
-    <div class="field"><label>Type</label><InputSelect class="input" @bind-Value="model.Type">@foreach (var x in LeadDeskOptions.Types) { <option>@x</option> }</InputSelect></div>
-    <div class="field"><label>Priority</label><InputSelect class="input" @bind-Value="model.Priority">@foreach (var x in LeadDeskOptions.Priorities) { <option>@x</option> }</InputSelect></div>
-    <div class="field"><label>Status</label><InputSelect class="input" @bind-Value="model.Status">@foreach (var x in LeadDeskOptions.Statuses) { <option>@x</option> }</InputSelect></div>
-    <div class="field span-2"><label>Developers</label><MultiSelect Options="developerOptions" @bind-Selected="model.SelectedDeveloperIds" Placeholder="Select developers" SearchPlaceholder="Search developers…" /></div>
-    <div class="field"><label>QA</label><InputSelect class="input" @bind-Value="model.AssignedQaId"><option value="">Unassigned</option>@foreach (var x in qa) { <option value="@x.Id">@x.FullName</option> }</InputSelect></div>
-    <div class="field"><label>Owner</label><InputSelect class="input" @bind-Value="model.OwnerId"><option value="">Unassigned</option>@foreach (var x in owners) { <option value="@x.Id">@x.FullName</option> }</InputSelect></div>
-    <div class="field"><label>Due date</label><InputDate class="input" @bind-Value="model.DueDate" /></div>
-    <div class="field"><label>Release version</label><InputText class="input" @bind-Value="model.ReleaseVersion" /></div>
-    <label class="check field"><InputCheckbox @bind-Value="model.IsClientVisible" /> Client visible</label>
-    <div class="field full"><label>Description</label><InputTextArea class="input textarea" @bind-Value="model.Description" /></div>
-    <div class="field full"><label>Latest update</label><InputTextArea class="input" @bind-Value="model.LatestUpdate" /></div>
-    <div class="field full"><label>Blocker reason</label><InputTextArea class="input" @bind-Value="model.BlockerReason" /></div>
-</div><div class="form-actions"><button class="primary-button" type="submit">Save task</button><a class="secondary-button" href="tasks">Cancel</a></div></section></EditForm>
+<PageTitle>@(Id == 0 ? "New task" : "Edit task") - ProjectPulse</PageTitle>
+
+<div class="page-heading task-page-heading">
+    <div><span class="eyebrow">@(Id == 0 ? "Create" : "Update")</span><h1>@(Id == 0 ? "New Task" : "Edit Task")</h1><p>Create and assign a client/account task.</p></div>
+</div>
+
+@if (isLoading)
+{
+    <div class="loading"><span class="loader"></span>Loading task form...</div>
+}
+else
+{
+    <EditForm Model="model" OnValidSubmit="Save" FormName="task-form">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+        @if (!string.IsNullOrWhiteSpace(errorMessage))
+        {
+            <div class="form-error">@errorMessage</div>
+        }
+
+        <div class="task-form-shell">
+            <section class="task-form-card">
+                <div class="task-section-title"><span>1</span><div><h2>Task Overview</h2><p>Capture the task brief, current status, and blockers.</p></div></div>
+                <div class="task-overview-grid">
+                    <div class="field">
+                        <AiFieldAssistant FieldName="Title" Value="@model.Title" Context="AiContext" AllowedActions="ShortTextActions" ShowImproveText="true" ReplaceText="value => model.Title = value">
+                            <InputText class="input" required @bind-Value="model.Title" placeholder="Enter a clear, concise title for the task" />
+                            <ValidationMessage For="() => model.Title" />
+                        </AiFieldAssistant>
+                    </div>
+                    <div class="field">
+                        <AiFieldAssistant FieldName="Description" Value="@model.Description" Context="AiContext" ShowImproveText="true" ReplaceText="value => model.Description = value">
+                            <InputTextArea class="input textarea" @bind-Value="model.Description" placeholder="Provide a detailed description of the task" />
+                        </AiFieldAssistant>
+                    </div>
+                    <div class="field">
+                        <AiFieldAssistant FieldName="Latest update" Value="@model.LatestUpdate" Context="AiContext" ShowImproveText="true" ReplaceText="value => model.LatestUpdate = value">
+                            <InputTextArea class="input compact-textarea" @bind-Value="model.LatestUpdate" placeholder="Share the latest update or current status" />
+                        </AiFieldAssistant>
+                    </div>
+                    <div class="field">
+                        <AiFieldAssistant FieldName="Blocker reason" Value="@model.BlockerReason" Context="AiContext" ShowImproveText="true" ReplaceText="value => model.BlockerReason = value">
+                            <InputTextArea class="input compact-textarea" @bind-Value="model.BlockerReason" placeholder="Explain why this task is blocked, if applicable" />
+                        </AiFieldAssistant>
+                    </div>
+                </div>
+            </section>
+
+            <section class="task-form-card">
+                <div class="task-section-title"><span>2</span><div><h2>Task Details</h2><p>Classify the work and connect it to an account or release.</p></div></div>
+                <div class="task-detail-grid">
+                    <div class="field"><label>Account</label><MultiSelect Options="accountOptions" @bind-Selected="model.SelectedAccountIds" Placeholder="All accounts" SearchPlaceholder="Search accounts..." /></div>
+                    <div class="field">
+                        <AiFieldAssistant FieldName="Module" Value="@model.ModuleName" Context="AiContext" AllowedActions="ShortTextActions" ReplaceText="value => model.ModuleName = value">
+                            <InputText class="input" @bind-Value="model.ModuleName" placeholder="Enter module name" />
+                        </AiFieldAssistant>
+                    </div>
+                    <div class="field"><label>Type</label><InputSelect class="input select-input" @bind-Value="model.Type">@foreach (var x in LeadDeskOptions.Types) { <option>@x</option> }</InputSelect></div>
+                    <div class="field"><label>Priority</label><InputSelect class="input select-input" @bind-Value="model.Priority">@foreach (var x in LeadDeskOptions.Priorities) { <option>@x</option> }</InputSelect></div>
+                    <div class="field"><label>Status</label><InputSelect class="input select-input" @bind-Value="model.Status">@foreach (var x in LeadDeskOptions.Statuses) { <option>@x</option> }</InputSelect></div>
+                    <div class="field"><label>Due date</label><InputDate class="input" @bind-Value="model.DueDate" /></div>
+                    <div class="field">
+                        <AiFieldAssistant FieldName="Release version" Value="@model.ReleaseVersion" Context="AiContext" AllowedActions="ShortTextActions" ReplaceText="value => model.ReleaseVersion = value">
+                            <InputText class="input" @bind-Value="model.ReleaseVersion" placeholder="Enter release version" />
+                        </AiFieldAssistant>
+                    </div>
+                    <label class="check field task-check"><InputCheckbox @bind-Value="model.IsClientVisible" /> Visible to client / account</label>
+                </div>
+            </section>
+
+            <section class="task-form-card">
+                <div class="task-section-title"><span>3</span><div><h2>Assignment</h2><p>Assign the task to delivery, QA, and ownership.</p></div></div>
+                <div class="task-assignment-grid">
+                    <div class="field"><label>Developers</label><MultiSelect Options="developerOptions" @bind-Selected="model.SelectedDeveloperIds" Placeholder="Backlog" SearchPlaceholder="Search developers..." /></div>
+                    <div class="field"><label>QA</label><InputSelect class="input select-input" @bind-Value="model.AssignedQaId"><option value="">Unassigned</option>@foreach (var x in qa) { <option value="@x.Id">@x.FullName</option> }</InputSelect></div>
+                    <div class="field"><label>Owner</label><InputSelect class="input select-input" @bind-Value="model.OwnerId"><option value="">Unassigned</option>@foreach (var x in owners) { <option value="@x.Id">@x.FullName</option> }</InputSelect></div>
+                </div>
+            </section>
+
+            <div class="form-actions task-form-actions"><button class="primary-button" type="submit" disabled="@isSaving">@(isSaving ? "Saving..." : "Save task")</button><a class="secondary-button" href="tasks">Cancel</a></div>
+        </div>
+    </EditForm>
+}
+
 @code {
     [Parameter] public long Id { get; set; }
-    private WorkItem model = new(); private List<LookupOption> accountOptions = []; private List<LookupOption> developerOptions = []; private List<TeamMember> qa = []; private List<TeamMember> owners = [];
+    [SupplyParameterFromQuery(Name = "accountId")] public long? AccountId { get; set; }
+    [SupplyParameterFromQuery(Name = "developerId")] public long? DeveloperId { get; set; }
+
+    private WorkItem model = new();
+    private List<LookupOption> accountOptions = [];
+    private List<LookupOption> developerOptions = [];
+    private List<TeamMember> qa = [];
+    private List<TeamMember> owners = [];
+    private bool isLoading = true;
+    private bool isSaving;
+    private string? errorMessage;
+    private static readonly IReadOnlyList<string> ShortTextActions = ["FixSpellingGrammar", "ReframeProfessionally", "MakeClientFriendly", "MakeShortClear"];
+
+    private AIWritingTaskContextDto AiContext => new()
+    {
+        AccountName = AccountContextName(),
+        Type = model.Type,
+        Priority = model.Priority,
+        Status = model.Status
+    };
+
     protected override async Task OnParametersSetAsync()
     {
-        var accounts = await LeadDesk.GetAccountsAsync(); var members = await LeadDesk.GetTeamAsync(true);
-        accountOptions = accounts.Select(x => new LookupOption(x.Id, x.Name)).ToList(); developerOptions = members.Where(x => x.Role != "Client").Select(x => new LookupOption(x.Id, x.FullName)).ToList();
-        qa = members.Where(x => x.Role == "QA").ToList(); owners = members.Where(x => x.Role is "Project Lead" or "Manager" or "Client").ToList();
-        model = Id == 0 ? new WorkItem { Status = "New", Priority = "Medium", Type = "Requirement", AssignedQaId = qa.FirstOrDefault()?.Id, OwnerId = owners.FirstOrDefault(x => x.Role == "Project Lead")?.Id } : await LeadDesk.GetTaskAsync(Id) ?? new WorkItem();
+        isLoading = true;
+        errorMessage = null;
+
+        var accounts = await LeadDesk.GetAccountsAsync();
+        var members = await LeadDesk.GetTeamAsync(true);
+        accountOptions = accounts.Select(x => new LookupOption(x.Id, x.Name)).ToList();
+        developerOptions = members.Where(x => x.Role != "Client").Select(x => new LookupOption(x.Id, x.FullName)).ToList();
+        qa = members.Where(x => x.Role == "QA").ToList();
+        owners = members.Where(x => x.Role is "Project Lead" or "Manager" or "Client").ToList();
+
+        model = Id == 0
+            ? new WorkItem { Status = "New", Priority = "Medium", Type = "Requirement", AssignedQaId = qa.FirstOrDefault()?.Id, OwnerId = owners.FirstOrDefault(x => x.Role == "Project Lead")?.Id }
+            : await LeadDesk.GetTaskAsync(Id) ?? new WorkItem();
+
+        if (Id == 0)
+        {
+            if (AccountId.HasValue && accounts.Any(x => x.Id == AccountId.Value)) model.SelectedAccountIds = [AccountId.Value];
+            if (DeveloperId.HasValue && members.Any(x => x.Id == DeveloperId.Value)) model.SelectedDeveloperIds = [DeveloperId.Value];
+        }
+
+        isLoading = false;
     }
-    private async Task Save() { var id = await LeadDesk.SaveTaskAsync(model); Navigation.NavigateTo($"tasks/{id}"); }
+
+    private async Task Save()
+    {
+        try
+        {
+            isSaving = true;
+            errorMessage = null;
+            var id = await LeadDesk.SaveTaskAsync(model);
+            Navigation.NavigateTo($"tasks/{id}");
+        }
+        catch (Exception ex)
+        {
+            errorMessage = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private string AccountContextName()
+    {
+        var selected = accountOptions
+            .Where(option => model.SelectedAccountIds.Contains(option.Id))
+            .Select(option => option.Label)
+            .ToList();
+        return selected.Count == 0 ? "All accounts" : string.Join(", ", selected);
+    }
 }

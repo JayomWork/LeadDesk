@@ -1,28 +1,96 @@
-@if (Items.Count == 0) { <div class="empty-state"><strong>No tasks found</strong><span>Try changing the filters or create a new task.</span></div> }
+@if (Items.Count == 0)
+{
+    <EmptyState Title="No tasks found" Message="Create a task or adjust your filters to see more results." ActionText="+ New task" ActionHref="tasks/new" />
+}
 else
 {
-<div class="table-wrap"><table class="data-table"><thead><tr><th>Task</th><th>Accounts</th><th>Status</th><th>Priority</th><th>Developers</th><th>Due</th><th></th></tr></thead><tbody>
-@foreach (var item in Items)
-{
-    <tr class="@RowClass(item.Status)">
-        <td><a class="task-title" href="tasks/@item.Id">@item.Title</a><small>@item.ModuleName · @item.Type</small></td>
-        <td>@AccountNames(item)</td>
-        <td><select class="status-select status-@Key(item.Status)" value="@item.Status" @onchange="e => StatusChanged(item, e.Value?.ToString() ?? item.Status)">@foreach (var status in LeadDeskOptions.Statuses) { <option value="@status">@status</option> }</select></td>
-        <td><span class="priority priority-@Key(item.Priority)">@item.Priority</span></td>
-        <td><div class="chip-stack">@foreach (var developer in Developers(item)) { <span class="person-chip"><span>@Initial(developer.FullName)</span>@developer.FullName</span> }</div></td>
-        <td>@item.DueDate?.ToString("dd MMM")</td>
-        <td><a class="icon-button" href="tasks/@item.Id/edit" title="Edit">✎</a></td>
-    </tr>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr><th>Task</th><th>Accounts</th><th>Status</th><th>Priority</th><th>Developers</th><th>Due</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Items)
+                {
+                    <tr class="@RowClass(item)">
+                        <td>
+                            <a class="task-title" href="tasks/@item.Id">@item.Title</a>
+                            <small>
+                                @item.ModuleName - @item.Type
+                                @if (PlannedRelease(item) is { } release)
+                                {
+                                    <span class="release-chip" title="Planned for release">@release</span>
+                                }
+                            </small>
+                        </td>
+                        <td>@AccountNames(item)</td>
+                        <td>
+                            <select class="status-select status-@Key(item.Status)" value="@item.Status" @onchange="e => StatusChanged(item, e.Value?.ToString() ?? item.Status)">
+                                @foreach (var status in LeadDeskOptions.Statuses) { <option value="@status">@status</option> }
+                            </select>
+                        </td>
+                        <td><span class="priority priority-@Key(item.Priority)">@item.Priority</span></td>
+                        <td>
+                            <div class="chip-stack">
+                                @if (Developers(item).Any())
+                                {
+                                    @foreach (var developer in Developers(item))
+                                    {
+                                        <span class="person-chip"><span>@Initial(developer.FullName)</span>@developer.FullName</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="person-chip muted"><span>B</span>Backlog</span>
+                                }
+                            </div>
+                        </td>
+                        <td>@item.DueDate?.ToString("dd MMM")</td>
+                        <td><a class="icon-button text-icon" href="tasks/@item.Id/edit" title="Edit task">Edit</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 }
-</tbody></table></div>
-}
+
 @code {
     [Parameter] public IReadOnlyList<WorkItem> Items { get; set; } = [];
     [Parameter] public EventCallback<(WorkItem Item, string Status)> OnStatusChanged { get; set; }
-    private async Task StatusChanged(WorkItem item, string status) { item.Status = status; await OnStatusChanged.InvokeAsync((item, status)); }
+
+    private async Task StatusChanged(WorkItem item, string status)
+    {
+        item.Status = status;
+        await OnStatusChanged.InvokeAsync((item, status));
+    }
+
     private static string Key(string value) => value.ToLowerInvariant().Replace(" ", "-");
-    private static string RowClass(string status) => status switch { "Ready for Release" => "ready-row", "Released" => "released-row", "Completed" => "completed-row", _ => "" };
+
+    private static string RowClass(WorkItem item)
+    {
+        if (PlannedRelease(item) != null) return "planned-row";
+        return item.Status switch { "Ready for Release" => "ready-row", "Released" => "released-row", "Completed" => "completed-row", _ => "" };
+    }
+
     private static string Initial(string value) => string.IsNullOrWhiteSpace(value) ? "?" : value[..1].ToUpperInvariant();
-    private static IEnumerable<TeamMember> Developers(WorkItem item) { var linked = item.WorkItemDevelopers.Select(x => x.TeamMember).ToList(); if (linked.Count == 0 && item.AssignedDeveloper != null) linked.Add(item.AssignedDeveloper); return linked; }
-    private static string AccountNames(WorkItem item) { var names = item.WorkItemAccounts.Select(x => x.AccountPractice.Name).ToList(); if (names.Count == 0 && item.AccountPractice != null) names.Add(item.AccountPractice.Name); return string.Join(", ", names); }
+
+    private static IEnumerable<TeamMember> Developers(WorkItem item)
+    {
+        var linked = item.WorkItemDevelopers.Select(x => x.TeamMember).ToList();
+        if (linked.Count == 0 && item.AssignedDeveloper != null) linked.Add(item.AssignedDeveloper);
+        return linked;
+    }
+
+    private static string AccountNames(WorkItem item)
+    {
+        var names = item.WorkItemAccounts.Select(x => x.AccountPractice.Name).ToList();
+        if (names.Count == 0 && item.AccountPractice != null) names.Add(item.AccountPractice.Name);
+        return names.Count == 0 ? "All accounts" : string.Join(", ", names);
+    }
+
+    private static string? PlannedRelease(WorkItem item) => item.ReleaseWorkItems
+        .Where(x => x.ReleasePlan.Status is not "Released" and not "Completed" and not "Cancelled")
+        .OrderBy(x => x.ReleasePlan.ReleaseDate ?? DateTime.MaxValue)
+        .Select(x => $"{x.ReleasePlan.Version}{(x.ReleasePlan.ReleaseDate.HasValue ? $" - {x.ReleasePlan.ReleaseDate.Value:dd MMM}" : string.Empty)}")
+        .FirstOrDefault();
 }

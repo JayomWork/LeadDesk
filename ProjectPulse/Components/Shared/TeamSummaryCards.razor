@@ -1,0 +1,32 @@
+<div class="team-summary-grid">
+    <div class="team-summary-card blue">
+        <span class="summary-icon people-icon"></span>
+        <div><small>Total Members</small><strong>@TotalMembers</strong><em>All team members</em></div>
+    </div>
+    <div class="team-summary-card green">
+        <span class="summary-icon check-icon"></span>
+        <div><small>Active Members</small><strong>@ActiveMembers</strong><em>@Percent(ActiveMembers, TotalMembers)% of team</em></div>
+    </div>
+    <div class="team-summary-card blue">
+        <span class="summary-icon people-icon"></span>
+        <div><small>Developers</small><strong>@Developers</strong><em>@Percent(Developers, TotalMembers)% of team</em></div>
+    </div>
+    <div class="team-summary-card violet">
+        <span class="summary-icon qa-icon"></span>
+        <div><small>QA</small><strong>@QaMembers</strong><em>@Percent(QaMembers, TotalMembers)% of team</em></div>
+    </div>
+    <div class="team-summary-card amber">
+        <span class="summary-icon task-icon"></span>
+        <div><small>Pending Tasks</small><strong>@PendingTasks</strong><em>Across all members</em></div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public int TotalMembers { get; set; }
+    [Parameter] public int ActiveMembers { get; set; }
+    [Parameter] public int Developers { get; set; }
+    [Parameter] public int QaMembers { get; set; }
+    [Parameter] public int PendingTasks { get; set; }
+
+    private static int Percent(int value, int total) => total == 0 ? 0 : (int)Math.Round(value * 100d / total);
+}

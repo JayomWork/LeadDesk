@@ -1,14 +1,14 @@
-# LeadDesk - Project Lead Command Center
+# LeadDesk - ProjectPulse
 
-LeadDesk is a .NET 10 MVC/Razor application for project/tech leads who need one place to manage account calls, requirements, work items, developer and QA assignments, standup updates, manager summaries, client progress, and release queues.
+LeadDesk now runs as a .NET 10 Blazor application for project and tech leads who need one workspace for accounts, tasks, standup, meetings, manager summaries, and release planning.
 
 ## Tech stack
 
-- ASP.NET Core MVC/Razor targeting `net10.0`
+- ASP.NET Core Blazor targeting `net10.0`
 - SQL Server
-- EF Core Code First
+- EF Core
 - ASP.NET Core Identity
-- Bootstrap 5 UI
+- ProjectPulse application/domain/infrastructure projects
 
 ## Prerequisites
 
@@ -18,47 +18,37 @@ LeadDesk is a .NET 10 MVC/Razor application for project/tech leads who need one 
 
 ## Setup
 
-Update the connection string in `src/LeadDesk.Web/appsettings.json`.
+Update the connection string in `ProjectPulse/appsettings.json`.
 
 ```json
-"DefaultConnection": "Server=(localdb)\MSSQLLocalDB;Database=LeadDeskDb;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True"
+"DefaultConnection": "Server=(localdb)\\MSSQLLocalDB;Database=LeadDeskDb;Trusted_Connection=True;MultipleActiveResultSets=true;TrustServerCertificate=True"
 ```
 
-Then run:
+Run the Blazor app:
 
 ```bash
-cd src/LeadDesk.Web
 dotnet restore
-dotnet ef migrations add InitialCreate
-dotnet ef database update
-dotnet run
+dotnet build LeadDesk.sln
+dotnet run --project ProjectPulse/ProjectPulse.csproj
 ```
 
-Default seeded users:
+Manual SQL scripts are kept in `docs/` and should be reviewed/executed manually when needed.
 
-| Role | Email | Password |
-|---|---|---|
-| Admin | admin@leaddesk.local | Admin@12345 |
-| Project Lead | lead@leaddesk.local | Admin@12345 |
-| Developer | dev@leaddesk.local | Admin@12345 |
-| QA | qa@leaddesk.local | Admin@12345 |
-| Manager | manager@leaddesk.local | Admin@12345 |
-| Client Viewer | client@leaddesk.local | Admin@12345 |
+Developer login credentials are documented in `docs/LOGIN_CREDENTIALS.md`.
 
-## MVP modules
+## Modules
 
 - Dashboard
 - Accounts / Practices
 - Team Members
-- Work Items / Tasks
-- Work Item Updates
+- Tasks
 - Meetings / Call Logs
-- Standup View
+- Daily Standup
 - Account Progress Summary
 - Manager Summary
-- Release Queue
+- Release Planning
 - Role-based access foundations
 
 ## Notes
 
-This is a starter solution generated for rapid development. It intentionally keeps business logic simple in MVC controllers so Codex or your team can extend it quickly. For production SaaS, split into Clean Architecture projects later.
+The old MVC/Razor app has been removed. Active development should happen in the Blazor `ProjectPulse` app and the shared `ProjectPulse.Application`, `ProjectPulse.Domain`, and `ProjectPulse.Infrastructure` projects.

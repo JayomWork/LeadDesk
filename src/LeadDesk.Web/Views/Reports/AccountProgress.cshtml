@@ -1,7 +1,0 @@
-@model IEnumerable<WorkItem>
-@{ ViewData["Title"] = "Account Progress"; ViewData["PageTitle"] = "Account Progress Summary"; var accounts = ViewBag.Accounts as List<AccountPractice> ?? new(); }
-<div class="panel"><div class="panel-header"><h2>Client / Account Summary</h2><button class="btn btn-outline-primary btn-sm" onclick="navigator.clipboard.writeText(document.body.innerText)">Copy Summary</button></div><form method="get" class="row g-2 mb-4"><div class="col-md-4"><select name="accountId" class="form-select"><option value="">All Accounts</option>@foreach(var a in accounts){<option value="@a.Id" selected="@(ViewBag.SelectedAccountId == a.Id)">@a.Name</option>}</select></div><div class="col"><button class="btn btn-primary">Filter</button></div></form>
-@foreach(var group in Model.GroupBy(x => x.Status)){
-    <h4>@group.Key</h4><partial name="_WorkItemTable" model="group" />
-}
-</div>

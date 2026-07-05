@@ -1,0 +1,111 @@
+@if (IsOpen && Summary != null)
+{
+    <div class="drawer-backdrop" @onclick="Close"></div>
+    <aside class="member-drawer">
+        <div class="drawer-head">
+            <div>
+                <span class="eyebrow">Member quick summary</span>
+                <h2>@Summary.Member.FullName</h2>
+            </div>
+            <button type="button" class="icon-button" title="Close" @onclick="Close">x</button>
+        </div>
+
+        <div class="drawer-profile">
+            <div class="team-avatar large">@Initial(Summary.Member.FullName)</div>
+            <div>
+                <div class="drawer-badges"><span class="role-pill">@Summary.Member.Role</span><span class="health-badge @(Summary.Member.IsActive ? "active" : "inactive")">@(Summary.Member.IsActive ? "Active" : "Inactive")</span></div>
+                <p>@(string.IsNullOrWhiteSpace(Summary.Member.Email) ? "No email added" : Summary.Member.Email)</p>
+            </div>
+        </div>
+
+        <section class="drawer-panel">
+            <h3>Workload overview</h3>
+            <div class="drawer-workload">
+                <div class="account-progress-ring" style="--progress:@Summary.CompletionPercentage"><span>@Summary.CompletionPercentage%</span></div>
+                <div class="drawer-counts">
+                    <span><strong class="pending-number">@Summary.PendingTaskCount</strong> Pending</span>
+                    <span><strong class="progress-number">@Summary.InProgressTaskCount</strong> In Progress</span>
+                    <span><strong class="complete-number">@Summary.CompletedTaskCount</strong> Completed</span>
+                    <span><strong class="overdue-number">@Summary.OverdueTaskCount</strong> Overdue</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="drawer-panel">
+            <h3>Primary account</h3>
+            <div class="drawer-account-row">@Summary.PrimaryAccountName</div>
+        </section>
+
+        <section class="drawer-panel">
+            <h3>Assigned accounts (@Summary.AssignedAccounts.Count)</h3>
+            @if (Summary.AssignedAccounts.Count == 0)
+            {
+                <p class="muted-text">No assigned accounts yet.</p>
+            }
+            else
+            {
+                <div class="drawer-chip-row">
+                    @foreach (var account in Summary.AssignedAccounts)
+                    {
+                        <span>@account</span>
+                    }
+                </div>
+            }
+        </section>
+
+        <section class="drawer-panel drawer-tasks">
+            <div class="drawer-panel-head">
+                <h3>@(ShowTaskList ? "Assigned tasks" : "Recent tasks")</h3>
+                @if (!ShowTaskList)
+                {
+                    <button type="button" class="secondary-button small" @onclick="() => OnViewTasks.InvokeAsync(Summary)">View all tasks</button>
+                }
+            </div>
+            @if (DisplayTasks.Count == 0)
+            {
+                <p class="muted-text">No tasks assigned yet.</p>
+            }
+            else
+            {
+                @foreach (var task in DisplayTasks)
+                {
+                    <div class="drawer-task-row">
+                        <div>
+                            <strong>@task.Title</strong>
+                            <small>@task.AccountName</small>
+                            @if (task.DueDate.HasValue)
+                            {
+                                <small>Due @task.DueDate.Value.ToString("dd MMM yyyy")</small>
+                            }
+                        </div>
+                        <div class="drawer-task-badges">
+                            <span class="status-label">@task.Status</span>
+                            <span class="priority priority-@task.Priority.ToLowerInvariant()">@task.Priority</span>
+                        </div>
+                    </div>
+                }
+            }
+        </section>
+
+        <div class="drawer-actions">
+            <button type="button" class="secondary-button" @onclick="() => OnViewTasks.InvokeAsync(Summary)">View all tasks</button>
+            <button type="button" class="primary-button" @onclick="() => OnAddTask.InvokeAsync(Summary)">+ Quick add task</button>
+        </div>
+    </aside>
+}
+
+@code {
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public bool ShowTaskList { get; set; }
+    [Parameter] public TeamMemberTaskSummary? Summary { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback<TeamMemberTaskSummary> OnViewTasks { get; set; }
+    [Parameter] public EventCallback<TeamMemberTaskSummary> OnAddTask { get; set; }
+
+    private IReadOnlyList<TeamMemberRecentTask> DisplayTasks => Summary == null
+        ? []
+        : ShowTaskList ? Summary.RecentTasks : Summary.RecentTasks.Take(5).ToList();
+
+    private async Task Close() => await OnClose.InvokeAsync();
+    private static string Initial(string value) => string.IsNullOrWhiteSpace(value) ? "?" : value.Trim()[..1].ToUpperInvariant();
+}

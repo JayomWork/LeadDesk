@@ -1,9 +1,0 @@
-@model IEnumerable<AccountPractice>
-@{ ViewData["Title"] = "Accounts"; ViewData["PageTitle"] = "Accounts / Practices"; }
-<div class="panel">
-    <div class="panel-header"><h2><i class="bi bi-building me-2"></i>Accounts</h2><a asp-action="Create" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg"></i>Add Account</a></div>
-    <form class="row g-2 mb-3"><div class="col-md-4"><input name="search" value="@ViewBag.Search" class="form-control" placeholder="Search account" /></div><div class="col"><button class="btn btn-outline-primary"><i class="bi bi-search"></i>Search</button></div></form>
-    <div class="table-responsive"><table class="table"><thead><tr><th>Name</th><th>Contact</th><th>Status</th><th>Go Live</th><th></th></tr></thead><tbody>
-    @foreach(var x in Model){<tr><td><a asp-action="Details" asp-route-id="@x.Id" class="fw-semibold">@x.Name</a></td><td>@x.ClientContactName</td><td><span class="badge status-badge">@x.Status</span></td><td>@x.GoLiveDate?.ToString("dd MMM yyyy")</td><td class="text-end"><a asp-action="Edit" asp-route-id="@x.Id" class="btn btn-light btn-sm"><i class="bi bi-pencil-square"></i>Edit</a></td></tr>}
-    </tbody></table></div>
-</div>

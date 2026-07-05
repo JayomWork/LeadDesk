@@ -11,6 +11,8 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddDbContextFactory<LeadDeskDbContext>(options => options.UseSqlServer(connectionString));
 builder.Services.AddScoped<ILeadDeskService, LeadDeskService>();
+builder.Services.Configure<AIWritingOptions>(builder.Configuration.GetSection("AI"));
+builder.Services.AddScoped<IAIWritingService, AIWritingService>();
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
     options.User.RequireUniqueEmail = true;
@@ -36,12 +38,22 @@ app.UseAuthorization();
 app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
+app.MapPost("/api/ai-writing/improve", async (AIWritingRequestDto request, IAIWritingService writingService, CancellationToken cancellationToken) =>
+{
+    if (string.IsNullOrWhiteSpace(request.Text)) return Results.BadRequest(new { message = "Please enter text first." });
+    if (request.Text.Length > 4000) return Results.BadRequest(new { message = "Text is too long. Please keep it under 4000 characters." });
+
+    var response = await writingService.ImproveTextAsync(request, cancellationToken);
+    return Results.Ok(response);
+});
 app.MapPost("/auth/login", async (HttpContext http, SignInManager<ApplicationUser> signInManager) =>
 {
     var form = await http.Request.ReadFormAsync();
     var email = form["email"].ToString();
     var password = form["password"].ToString();
-    var result = await signInManager.PasswordSignInAsync(email, password, true, lockoutOnFailure: true);
+    var rememberMe = form.TryGetValue("remember", out var rememberValues) &&
+        rememberValues.Any(value => string.Equals(value, "true", StringComparison.OrdinalIgnoreCase) || string.Equals(value, "on", StringComparison.OrdinalIgnoreCase));
+    var result = await signInManager.PasswordSignInAsync(email, password, rememberMe, lockoutOnFailure: true);
     return Results.Redirect(result.Succeeded ? "/" : "/login?error=1");
 }).DisableAntiforgery();
 app.MapPost("/auth/logout", async (SignInManager<ApplicationUser> signInManager) =>

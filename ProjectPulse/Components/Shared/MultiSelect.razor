@@ -7,7 +7,8 @@
                 @foreach (var item in SelectedOptions.Take(2)) { <span class="selection-chip">@item.Label</span> }
                 @if (Selected.Count > 2) { <span class="selection-chip muted">+@(Selected.Count - 2) more</span> }
             }
-        </span><span>⌄</span>
+        </span>
+        <span class="select-caret" aria-hidden="true"></span>
     </button>
     @if (open)
     {
@@ -31,11 +32,33 @@
     [Parameter] public EventCallback<List<long>> SelectedChanged { get; set; }
     [Parameter] public string Placeholder { get; set; } = "Select options";
     [Parameter] public string SearchPlaceholder { get; set; } = "Search...";
-    private bool open; private string search = string.Empty;
+
+    private bool open;
+    private string search = string.Empty;
+
     private IEnumerable<LookupOption> VisibleOptions => Options.Where(x => string.IsNullOrWhiteSpace(search) || x.Label.Contains(search, StringComparison.OrdinalIgnoreCase));
     private IEnumerable<LookupOption> SelectedOptions => Options.Where(x => Selected.Contains(x.Id));
+
     private void Toggle() => open = !open;
-    private async Task Change(long id, bool chosen) { var copy = Selected.ToList(); if (chosen && !copy.Contains(id)) copy.Add(id); if (!chosen) copy.Remove(id); Selected = copy; await SelectedChanged.InvokeAsync(copy); }
-    private async Task Clear() { Selected = []; await SelectedChanged.InvokeAsync(Selected); }
-    private async Task SelectVisible() { Selected = Selected.Concat(VisibleOptions.Select(x => x.Id)).Distinct().ToList(); await SelectedChanged.InvokeAsync(Selected); }
+
+    private async Task Change(long id, bool chosen)
+    {
+        var copy = Selected.ToList();
+        if (chosen && !copy.Contains(id)) copy.Add(id);
+        if (!chosen) copy.Remove(id);
+        Selected = copy;
+        await SelectedChanged.InvokeAsync(copy);
+    }
+
+    private async Task Clear()
+    {
+        Selected = [];
+        await SelectedChanged.InvokeAsync(Selected);
+    }
+
+    private async Task SelectVisible()
+    {
+        Selected = Selected.Concat(VisibleOptions.Select(x => x.Id)).Distinct().ToList();
+        await SelectedChanged.InvokeAsync(Selected);
+    }
 }

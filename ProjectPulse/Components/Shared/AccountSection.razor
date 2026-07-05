@@ -1,0 +1,22 @@
+@if (Items.Count > 0)
+{
+    <section class="account-section @Tone">
+        <div class="account-section-head">
+            <div><span></span><strong>@Title</strong><em>@Items.Count</em></div>
+            <p>@Description</p>
+        </div>
+        <div class="account-workload-grid">
+            @foreach (var item in Items)
+            {
+                <AccountCard Summary="item" />
+            }
+        </div>
+    </section>
+}
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter] public string Description { get; set; } = string.Empty;
+    [Parameter] public string Tone { get; set; } = "stable";
+    [Parameter, EditorRequired] public IReadOnlyList<AccountTaskSummary> Items { get; set; } = [];
+}

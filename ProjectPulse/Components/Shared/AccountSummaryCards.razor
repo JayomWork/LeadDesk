@@ -1,0 +1,26 @@
+<section class="account-summary-grid">
+    <div class="account-summary-card blue">
+        <span class="summary-icon"></span>
+        <div><small>Total Accounts</small><strong>@Items.Count</strong><em>All visible accounts</em></div>
+    </div>
+    <div class="account-summary-card amber">
+        <span class="summary-icon"></span>
+        <div><small>Pending Tasks</small><strong>@Items.Sum(x => x.PendingTasks)</strong><em>Needs triage or planning</em></div>
+    </div>
+    <div class="account-summary-card violet">
+        <span class="summary-icon"></span>
+        <div><small>In Queue Tasks</small><strong>@Items.Sum(x => x.InQueueTasks)</strong><em>Active delivery queue</em></div>
+    </div>
+    <div class="account-summary-card green">
+        <span class="summary-icon"></span>
+        <div><small>Completed Tasks</small><strong>@Items.Sum(x => x.DoneTasks)</strong><em>Released or completed</em></div>
+    </div>
+    <div class="account-summary-card red">
+        <span class="summary-icon"></span>
+        <div><small>Overdue Tasks</small><strong>@Items.Sum(x => x.OverdueTasks)</strong><em>Requires attention</em></div>
+    </div>
+</section>
+
+@code {
+    [Parameter, EditorRequired] public IReadOnlyList<AccountTaskSummary> Items { get; set; } = [];
+}

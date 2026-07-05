@@ -1,13 +1,17 @@
-<div class="brand"><span class="brand-mark">P</span><div><strong>ProjectPulse</strong><small>Lead Desk</small></div></div>
+<div class="brand">
+    <span class="brand-mark">P</span>
+    <div><strong>ProjectPulse</strong><small>Lead Desk</small></div>
+</div>
 <nav class="nav-list">
-    <NavLink href="" Match="NavLinkMatch.All"><span>⌂</span>Dashboard</NavLink>
-    <NavLink href="accounts"><span>◇</span>Accounts</NavLink>
-    <NavLink href="tasks"><span>✓</span>Tasks</NavLink>
-    <NavLink href="meetings"><span>◫</span>Meetings</NavLink>
-    <NavLink href="team"><span>◎</span>Team</NavLink>
+    <NavLink href="" Match="NavLinkMatch.All"><NavIcon Name="dashboard" />Dashboard</NavLink>
+    <NavLink href="accounts"><NavIcon Name="accounts" />Accounts</NavLink>
+    <NavLink href="tasks"><NavIcon Name="tasks" />Tasks</NavLink>
+    <NavLink href="releases"><NavIcon Name="releases" />Releases</NavLink>
+    <NavLink href="meetings"><NavIcon Name="meetings" />Meetings</NavLink>
+    <NavLink href="team"><NavIcon Name="team" />Team</NavLink>
     <div class="nav-label">Reports</div>
-    <NavLink href="reports/standup"><span>◉</span>Standup</NavLink>
-    <NavLink href="reports/accounts"><span>⌁</span>Account progress</NavLink>
-    <NavLink href="reports/manager"><span>▤</span>Manager summary</NavLink>
+    <NavLink href="reports/standup"><NavIcon Name="standup" />Standup</NavLink>
+    <NavLink href="reports/accounts"><NavIcon Name="account-progress" />Account progress</NavLink>
+    <NavLink href="reports/manager"><NavIcon Name="manager-summary" />Manager summary</NavLink>
 </nav>
 <div class="sidebar-foot"><div><span class="online-dot"></span>Connected to LeadDesk DB</div><form method="post" action="/auth/logout"><button type="submit" class="logout-button">Sign out</button></form></div>

@@ -1,7 +1,141 @@
 @page "/accounts"
 @attribute [Authorize]
 @rendermode InteractiveServer
-<PageTitle>Accounts · ProjectPulse</PageTitle>
-<div class="page-heading"><div><span class="eyebrow">Portfolio</span><h1>Accounts</h1><p>Every client practice and its delivery context.</p></div><a class="primary-button" href="accounts/new">＋ New account</a></div>
-<section class="surface"><div class="section-head"><input class="input search-input" placeholder="Search accounts…" @bind="search" @bind:event="oninput" /><button class="secondary-button" @onclick="Load">Search</button></div><div class="card-grid">@foreach (var account in accounts) { <a class="entity-card" href="accounts/@account.Id"><div><span class="state-dot @(account.IsActive ? "active" : null)"></span><small>@account.Status</small></div><h2>@account.Name</h2><p>@account.ClientContactName</p><span>@account.ClientContactEmail</span></a> }</div></section>
-@code { private string? search; private List<AccountPractice> accounts = []; protected override async Task OnInitializedAsync() => await Load(); private async Task Load() => accounts = await LeadDesk.GetAccountsAsync(search); }
+<PageTitle>Accounts - ProjectPulse</PageTitle>
+
+<div class="page-heading">
+    <div><span class="eyebrow">Portfolio</span><h1>Accounts</h1><p>Overview of client workload, account health, meetings, and task status.</p></div>
+    <a class="primary-button" href="accounts/new">+ New account</a>
+</div>
+
+<AccountSummaryCards Items="FilteredSummaries" />
+
+<section class="surface account-surface">
+    <AccountFilterBar
+        Search="@search"
+        SearchChanged="value => search = value"
+        Status="@statusFilter"
+        StatusChanged="value => statusFilter = value"
+        Priority="@priorityFilter"
+        PriorityChanged="value => priorityFilter = value"
+        TaskStatus="@taskStatusFilter"
+        TaskStatusChanged="value => taskStatusFilter = value"
+        Owner="@ownerFilter"
+        OwnerChanged="value => ownerFilter = value"
+        SortBy="@sortBy"
+        SortByChanged="value => sortBy = value"
+        ViewMode="@viewMode"
+        ViewModeChanged="value => viewMode = value"
+        OwnerOptions="OwnerOptions"
+        StatusOptions="StatusOptions" />
+
+    @if (isLoading)
+    {
+        <div class="loading"><span class="loader"></span>Loading accounts...</div>
+    }
+    else if (FilteredSummaries.Count == 0)
+    {
+        <EmptyState Title="No accounts found" Message="Adjust your filters or create a new account." ActionText="+ New account" ActionHref="accounts/new" />
+    }
+    else if (viewMode == "List")
+    {
+        <div class="table-wrap">
+            <table class="data-table account-table">
+                <thead>
+                    <tr><th>Account</th><th>Status</th><th>Owner</th><th>Priority</th><th>Pending</th><th>In Queue</th><th>Completed</th><th>Overdue</th><th>Updated</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var summary in FilteredSummaries)
+                    {
+                        <tr class="@(IsNeedsAttention(summary) ? "attention-row" : null)">
+                            <td><a class="task-title" href="accounts/@summary.Account.Id">@summary.Account.Name</a><small>@ContactText(summary.Account)</small></td>
+                            <td><span class="health-badge @(summary.Account.IsActive ? "active" : "inactive")">@(summary.Account.IsActive ? "Active" : "Inactive")</span></td>
+                            <td>@summary.OwnerName</td>
+                            <td><span class="priority-badge @summary.Priority.ToLowerInvariant()">@summary.Priority</span></td>
+                            <td>@summary.PendingTasks</td>
+                            <td>@summary.InQueueTasks</td>
+                            <td>@summary.DoneTasks</td>
+                            <td><span class="@(summary.OverdueTasks > 0 ? "overdue-number" : null)">@summary.OverdueTasks</span></td>
+                            <td>@summary.LastUpdatedAt.ToLocalTime().ToString("dd MMM")</td>
+                            <td><a class="secondary-button small" href="tasks/new?accountId=@summary.Account.Id">+ Task</a></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+    else
+    {
+        <AccountSection Title="Needs Attention" Description="Accounts with overdue or high-priority pending work." Tone="danger" Items="NeedsAttention" />
+        <AccountSection Title="Active Work" Description="Accounts with ongoing work in the delivery queue." Tone="warning" Items="ActiveWork" />
+        <AccountSection Title="Stable Accounts" Description="Accounts with low risk or no overdue work." Tone="stable" Items="StableAccounts" />
+    }
+</section>
+
+@code {
+    private string search = string.Empty;
+    private string statusFilter = string.Empty;
+    private string priorityFilter = string.Empty;
+    private string taskStatusFilter = string.Empty;
+    private string ownerFilter = string.Empty;
+    private string sortBy = "Most Pending";
+    private string viewMode = "Cards";
+    private bool isLoading = true;
+    private List<AccountTaskSummary> allSummaries = [];
+
+    private IReadOnlyList<string> OwnerOptions => allSummaries
+        .Select(x => x.OwnerName)
+        .Where(x => !string.IsNullOrWhiteSpace(x))
+        .Distinct()
+        .OrderBy(x => x)
+        .ToList();
+
+    private IReadOnlyList<string> StatusOptions => allSummaries
+        .Select(x => x.Account.IsActive ? "Active" : "Inactive")
+        .Distinct()
+        .OrderBy(x => x)
+        .ToList();
+
+    private List<AccountTaskSummary> FilteredSummaries => Sort(Filter(allSummaries)).ToList();
+    private List<AccountTaskSummary> NeedsAttention => FilteredSummaries.Where(IsNeedsAttention).ToList();
+    private List<AccountTaskSummary> ActiveWork => FilteredSummaries.Where(x => !IsNeedsAttention(x) && x.Account.IsActive && (x.PendingTasks > 0 || x.InQueueTasks > 0)).ToList();
+    private List<AccountTaskSummary> StableAccounts => FilteredSummaries.Where(x => !IsNeedsAttention(x) && !ActiveWork.Any(active => active.Account.Id == x.Account.Id)).ToList();
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        isLoading = true;
+        allSummaries = await LeadDesk.GetAccountTaskSummariesAsync();
+        isLoading = false;
+    }
+
+    private IEnumerable<AccountTaskSummary> Filter(IEnumerable<AccountTaskSummary> source)
+    {
+        if (!string.IsNullOrWhiteSpace(search)) source = source.Where(x => x.Account.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || ContactText(x.Account).Contains(search, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(statusFilter)) source = source.Where(x => (x.Account.IsActive ? "Active" : "Inactive") == statusFilter);
+        if (!string.IsNullOrWhiteSpace(priorityFilter)) source = source.Where(x => x.Priority == priorityFilter);
+        if (!string.IsNullOrWhiteSpace(taskStatusFilter)) source = source.Where(x => x.TaskStatuses.Contains(taskStatusFilter));
+        if (!string.IsNullOrWhiteSpace(ownerFilter)) source = source.Where(x => x.OwnerName == ownerFilter);
+        return source;
+    }
+
+    private IEnumerable<AccountTaskSummary> Sort(IEnumerable<AccountTaskSummary> source) => sortBy switch
+    {
+        "Most Overdue" => source.OrderByDescending(x => x.OverdueTasks).ThenByDescending(x => x.PendingTasks).ThenBy(x => x.Account.Name),
+        "Recently Updated" => source.OrderByDescending(x => x.LastUpdatedAt).ThenBy(x => x.Account.Name),
+        "Account Name" => source.OrderBy(x => x.Account.Name),
+        "Priority" => source.OrderBy(x => PriorityRank(x.Priority)).ThenByDescending(x => x.PendingTasks).ThenBy(x => x.Account.Name),
+        _ => source.OrderByDescending(x => x.PendingTasks).ThenByDescending(x => x.OverdueTasks).ThenBy(x => x.Account.Name)
+    };
+
+    private static bool IsNeedsAttention(AccountTaskSummary summary) => summary.OverdueTasks > 0 || summary.PendingTasks >= 10 || summary.Priority == "High";
+    private static int PriorityRank(string priority) => priority switch { "High" => 0, "Medium" => 1, _ => 2 };
+
+    private static string ContactText(AccountPractice account)
+    {
+        if (!string.IsNullOrWhiteSpace(account.ClientContactName)) return $"Client Contact: {account.ClientContactName}";
+        if (!string.IsNullOrWhiteSpace(account.ClientContactEmail)) return account.ClientContactEmail;
+        return "No client contact";
+    }
+}

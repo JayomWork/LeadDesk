@@ -1,0 +1,60 @@
+<div class="account-filter-bar">
+    <input class="input" placeholder="Search accounts..." value="@Search" @oninput="SearchInput" />
+    <select class="input select-input" value="@Status" @onchange="StatusInput">
+        <option value="">All statuses</option>
+        @foreach (var option in StatusOptions) { <option value="@option">@option</option> }
+    </select>
+    <select class="input select-input" value="@Priority" @onchange="PriorityInput">
+        <option value="">All priorities</option>
+        <option>High</option>
+        <option>Medium</option>
+        <option>Low</option>
+    </select>
+    <select class="input select-input" value="@TaskStatus" @onchange="TaskStatusInput">
+        <option value="">All task statuses</option>
+        @foreach (var option in LeadDeskOptions.Statuses) { <option value="@option">@option</option> }
+    </select>
+    <select class="input select-input" value="@Owner" @onchange="OwnerInput">
+        <option value="">All owners</option>
+        @foreach (var owner in OwnerOptions) { <option value="@owner">@owner</option> }
+    </select>
+    <select class="input select-input" value="@SortBy" @onchange="SortInput">
+        <option>Most Pending</option>
+        <option>Most Overdue</option>
+        <option>Recently Updated</option>
+        <option>Account Name</option>
+        <option>Priority</option>
+    </select>
+    <div class="segmented-control" aria-label="Account view mode">
+        <button class="@(ViewMode == "Cards" ? "active" : null)" type="button" @onclick="ShowCards">Cards</button>
+        <button class="@(ViewMode == "List" ? "active" : null)" type="button" @onclick="ShowList">List</button>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Search { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> SearchChanged { get; set; }
+    [Parameter] public string Status { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> StatusChanged { get; set; }
+    [Parameter] public string Priority { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> PriorityChanged { get; set; }
+    [Parameter] public string TaskStatus { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> TaskStatusChanged { get; set; }
+    [Parameter] public string Owner { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> OwnerChanged { get; set; }
+    [Parameter] public string SortBy { get; set; } = "Most Pending";
+    [Parameter] public EventCallback<string> SortByChanged { get; set; }
+    [Parameter] public string ViewMode { get; set; } = "Cards";
+    [Parameter] public EventCallback<string> ViewModeChanged { get; set; }
+    [Parameter] public IReadOnlyList<string> OwnerOptions { get; set; } = [];
+    [Parameter] public IReadOnlyList<string> StatusOptions { get; set; } = ["Active", "Inactive"];
+
+    private async Task SearchInput(ChangeEventArgs args) => await SearchChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty);
+    private async Task StatusInput(ChangeEventArgs args) => await StatusChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty);
+    private async Task PriorityInput(ChangeEventArgs args) => await PriorityChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty);
+    private async Task TaskStatusInput(ChangeEventArgs args) => await TaskStatusChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty);
+    private async Task OwnerInput(ChangeEventArgs args) => await OwnerChanged.InvokeAsync(args.Value?.ToString() ?? string.Empty);
+    private async Task SortInput(ChangeEventArgs args) => await SortByChanged.InvokeAsync(args.Value?.ToString() ?? "Most Pending");
+    private async Task ShowCards() => await ViewModeChanged.InvokeAsync("Cards");
+    private async Task ShowList() => await ViewModeChanged.InvokeAsync("List");
+}

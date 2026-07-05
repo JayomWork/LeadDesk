@@ -1,7 +1,0 @@
-@model IEnumerable<WorkItem>
-@{ ViewData["Title"] = "Manager Summary"; ViewData["PageTitle"] = "Manager Summary"; }
-<div class="panel"><div class="panel-header"><h2>Team Workload</h2><button class="btn btn-outline-primary btn-sm" onclick="window.print()">Print</button></div>
-@foreach(var group in Model.GroupBy(x => x.AssignedDeveloper?.FullName ?? "Unassigned")){
-    <div class="summary-block"><h4>@group.Key</h4><div class="text-muted mb-2">@group.Count() active tasks • @group.Count(x=>x.Status=="Blocked") blocked • @group.Count(x=>x.Status=="Ready for QA") ready for QA</div><partial name="_WorkItemTable" model="group" /></div>
-}
-</div>

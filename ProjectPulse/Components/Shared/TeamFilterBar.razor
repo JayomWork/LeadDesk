@@ -1,0 +1,50 @@
+<div class="team-filter-bar">
+    <input class="input" value="@Search" placeholder="Search member..." @oninput="OnSearchChanged" />
+    <select class="input select-input" value="@Role" @onchange="OnRoleChanged">
+        <option value="">All roles</option>
+        @foreach (var role in Roles)
+        {
+            <option value="@role">@role</option>
+        }
+    </select>
+    <select class="input select-input" value="@Status" @onchange="OnStatusChanged">
+        <option value="">All status</option>
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
+    </select>
+    <select class="input select-input" value="@Account" @onchange="OnAccountChanged">
+        <option value="">All accounts</option>
+        @foreach (var account in Accounts)
+        {
+            <option value="@account">@account</option>
+        }
+    </select>
+    <select class="input select-input" value="@SortBy" @onchange="OnSortChanged">
+        <option value="MostPending">Most pending tasks</option>
+        <option value="MostOverdue">Most overdue tasks</option>
+        <option value="RecentlyUpdated">Recently updated</option>
+        <option value="Name">Name</option>
+        <option value="Role">Role</option>
+    </select>
+</div>
+
+@code {
+    [Parameter] public string? Search { get; set; }
+    [Parameter] public EventCallback<string?> SearchChanged { get; set; }
+    [Parameter] public string? Role { get; set; }
+    [Parameter] public EventCallback<string?> RoleChanged { get; set; }
+    [Parameter] public string? Status { get; set; }
+    [Parameter] public EventCallback<string?> StatusChanged { get; set; }
+    [Parameter] public string? Account { get; set; }
+    [Parameter] public EventCallback<string?> AccountChanged { get; set; }
+    [Parameter] public string SortBy { get; set; } = "MostPending";
+    [Parameter] public EventCallback<string> SortByChanged { get; set; }
+    [Parameter] public IReadOnlyList<string> Roles { get; set; } = [];
+    [Parameter] public IReadOnlyList<string> Accounts { get; set; } = [];
+
+    private async Task OnSearchChanged(ChangeEventArgs args) => await SearchChanged.InvokeAsync(args.Value?.ToString());
+    private async Task OnRoleChanged(ChangeEventArgs args) => await RoleChanged.InvokeAsync(args.Value?.ToString());
+    private async Task OnStatusChanged(ChangeEventArgs args) => await StatusChanged.InvokeAsync(args.Value?.ToString());
+    private async Task OnAccountChanged(ChangeEventArgs args) => await AccountChanged.InvokeAsync(args.Value?.ToString());
+    private async Task OnSortChanged(ChangeEventArgs args) => await SortByChanged.InvokeAsync(args.Value?.ToString() ?? "MostPending");
+}

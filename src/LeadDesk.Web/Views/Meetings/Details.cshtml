@@ -1,4 +1,0 @@
-@model Meeting
-@{ ViewData["Title"] = Model.Title; ViewData["PageTitle"] = "Meeting Details"; }
-<div class="panel"><div class="panel-header"><h2>@Model.Title</h2><span>@Model.MeetingDate.ToString("dd MMM yyyy hh:mm tt")</span></div><div class="text-muted">@Model.MeetingType • @Model.AccountPractice?.Name</div><hr/><h5>Discussion Summary</h5><p>@Model.DiscussionSummary</p><h5>Decisions</h5><p>@Model.Decisions</p><h5>Next Steps</h5><p>@Model.NextSteps</p></div>
-<div class="panel mt-4"><h2>Linked Tasks</h2><partial name="_WorkItemTable" model="Model.MeetingWorkItems.Select(x=>x.WorkItem)" /></div>
