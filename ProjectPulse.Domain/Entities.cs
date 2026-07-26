@@ -53,6 +53,7 @@ public class WorkItem
     public string? LatestUpdate { get; set; }
     public string? BlockerReason { get; set; }
     public bool IsClientVisible { get; set; }
+    public bool IsImportant { get; set; }
     public bool IsDeleted { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
@@ -148,6 +149,7 @@ public class ReleaseWorkItem
     public ReleasePlan ReleasePlan { get; set; } = null!;
     public long WorkItemId { get; set; }
     public WorkItem WorkItem { get; set; } = null!;
+    public int SortOrder { get; set; }
 }
 
 public class WorkItemDeveloper

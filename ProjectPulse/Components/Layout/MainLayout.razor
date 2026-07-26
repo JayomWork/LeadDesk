@@ -5,7 +5,10 @@
     <main class="main-stage">
         <header class="topbar">
             <div><span class="eyebrow">ProjectPulse workspace</span><strong>Lead Desk</strong></div>
-            <a class="primary-button" href="tasks/new">+ New task</a>
+            <div class="topbar-actions">
+                <ImportantTasksPopup />
+                <a class="primary-button" href="tasks/new">+ New task</a>
+            </div>
         </header>
         <article class="page-content">@Body</article>
     </main>

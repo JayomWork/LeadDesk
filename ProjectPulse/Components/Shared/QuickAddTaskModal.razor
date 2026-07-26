@@ -19,6 +19,7 @@
                     <div class="field"><label>Account</label><InputSelect class="input select-input" @bind-Value="selectedAccountId"><option value="">All accounts</option>@foreach (var account in Accounts) { <option value="@account.Id">@account.Name</option> }</InputSelect></div>
                     <div class="field"><label>Priority</label><InputSelect class="input select-input" @bind-Value="model.Priority">@foreach (var priority in LeadDeskOptions.Priorities) { <option>@priority</option> }</InputSelect></div>
                     <div class="field"><label>Due date</label><InputDate class="input" @bind-Value="model.DueDate" /></div>
+                    <label class="check field"><InputCheckbox @bind-Value="model.IsImportant" /> Mark as important</label>
                     <div class="field full"><label>Description optional</label><InputTextArea class="input compact-textarea" @bind-Value="model.Description" placeholder="Add a short note if needed" /></div>
                 </div>
                 <div class="modal-actions">

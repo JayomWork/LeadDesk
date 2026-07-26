@@ -6,6 +6,7 @@ namespace ProjectPulse.Infrastructure;
 
 public sealed class LeadDeskService(IDbContextFactory<LeadDeskDbContext> contextFactory) : ILeadDeskService
 {
+    public event Action? ImportantTasksChanged;
     private static readonly string[] ArchivedStatuses = ["Released", "Completed", "Cancelled"];
     private static readonly string[] ReleaseCandidateStatuses = ["QA Done", "Ready for UAT", "Ready for Release"];
     private static readonly string[] QaStatuses = ["Ready for QA", "In QA", "QA Failed"];
@@ -18,14 +19,26 @@ public sealed class LeadDeskService(IDbContextFactory<LeadDeskDbContext> context
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
         var now = DateTime.UtcNow;
         var weekEnd = now.AddDays(7);
+        var counts = await db.WorkItems
+            .GroupBy(_ => 1)
+            .Select(items => new
+            {
+                TotalOpen = items.Count(x => !ArchivedStatuses.Contains(x.Status)),
+                InDevelopment = items.Count(x => x.Status == "In Dev"),
+                ReadyForQa = items.Count(x => x.Status == "Ready for QA"),
+                Blocked = items.Count(x => x.Status == "Blocked"),
+                DueThisWeek = items.Count(x => x.DueDate != null && x.DueDate <= weekEnd && !ArchivedStatuses.Contains(x.Status)),
+                ReleasedThisMonth = items.Count(x => x.Status == "Released" && x.UpdatedAt != null && x.UpdatedAt.Value.Month == now.Month && x.UpdatedAt.Value.Year == now.Year)
+            })
+            .FirstOrDefaultAsync(cancellationToken);
         return new DashboardSummary
         {
-            TotalOpen = await db.WorkItems.CountAsync(x => !ArchivedStatuses.Contains(x.Status), cancellationToken),
-            InDevelopment = await db.WorkItems.CountAsync(x => x.Status == "In Dev", cancellationToken),
-            ReadyForQa = await db.WorkItems.CountAsync(x => x.Status == "Ready for QA", cancellationToken),
-            Blocked = await db.WorkItems.CountAsync(x => x.Status == "Blocked", cancellationToken),
-            DueThisWeek = await db.WorkItems.CountAsync(x => x.DueDate != null && x.DueDate <= weekEnd && !ArchivedStatuses.Contains(x.Status), cancellationToken),
-            ReleasedThisMonth = await db.WorkItems.CountAsync(x => x.Status == "Released" && x.UpdatedAt != null && x.UpdatedAt.Value.Month == now.Month && x.UpdatedAt.Value.Year == now.Year, cancellationToken),
+            TotalOpen = counts?.TotalOpen ?? 0,
+            InDevelopment = counts?.InDevelopment ?? 0,
+            ReadyForQa = counts?.ReadyForQa ?? 0,
+            Blocked = counts?.Blocked ?? 0,
+            DueThisWeek = counts?.DueThisWeek ?? 0,
+            ReleasedThisMonth = counts?.ReleasedThisMonth ?? 0,
             RecentItems = await TaskGraph(db.WorkItems).OrderByDescending(x => x.UpdatedAt ?? x.CreatedAt).Take(8).ToListAsync(cancellationToken)
         };
     }
@@ -92,6 +105,7 @@ public sealed class LeadDeskService(IDbContextFactory<LeadDeskDbContext> context
         db.WorkItemAccounts.AddRange(input.SelectedAccountIds.Distinct().Select(id => new WorkItemAccount { WorkItemId = item.Id, AccountPracticeId = id }));
         if (input.Id != 0 && oldStatus != item.Status) db.WorkItemUpdates.Add(new WorkItemUpdate { WorkItemId = item.Id, OldStatus = oldStatus, NewStatus = item.Status, UpdateText = $"Status changed from {oldStatus} to {item.Status}." });
         await db.SaveChangesAsync(cancellationToken);
+        ImportantTasksChanged?.Invoke();
         return item.Id;
     }
 
@@ -110,6 +124,27 @@ public sealed class LeadDeskService(IDbContextFactory<LeadDeskDbContext> context
     }
 
     public async Task ArchiveTaskAsync(long id, CancellationToken cancellationToken = default) => await UpdateTaskStatusAsync(id, "Completed", cancellationToken);
+
+    public async Task UpdateTaskImportanceAsync(long id, bool isImportant, CancellationToken cancellationToken = default)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var updated = await db.WorkItems
+            .Where(x => x.Id == id)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.IsImportant, isImportant), cancellationToken);
+        if (updated == 0) throw new InvalidOperationException("Task not found.");
+        ImportantTasksChanged?.Invoke();
+    }
+
+    public async Task<List<WorkItem>> GetImportantTasksAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+        return await TaskGraph(db.WorkItems)
+            .Where(x => x.IsImportant)
+            .OrderBy(x => x.DueDate ?? DateTime.MaxValue)
+            .ThenByDescending(x => x.UpdatedAt ?? x.CreatedAt)
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+    }
 
     public async Task<List<AccountPractice>> GetAccountsAsync(string? search = null, CancellationToken cancellationToken = default)
     {
@@ -227,14 +262,32 @@ public sealed class LeadDeskService(IDbContextFactory<LeadDeskDbContext> context
         var memberIds = members.Select(x => x.Id).ToHashSet();
         if (memberIds.Count == 0) return [];
 
-        var tasks = await TaskGraph(db.WorkItems)
-            .Include(x => x.Owner)
-            .AsNoTracking()
+        var tasks = await db.WorkItems
             .Where(x =>
                 (x.AssignedDeveloperId.HasValue && memberIds.Contains(x.AssignedDeveloperId.Value)) ||
                 (x.AssignedQaId.HasValue && memberIds.Contains(x.AssignedQaId.Value)) ||
                 (x.OwnerId.HasValue && memberIds.Contains(x.OwnerId.Value)) ||
                 x.WorkItemDevelopers.Any(d => memberIds.Contains(d.TeamMemberId)))
+            .Select(x => new
+            {
+                x.Id,
+                x.Title,
+                x.Status,
+                x.Priority,
+                x.IsImportant,
+                x.DueDate,
+                x.CreatedAt,
+                x.UpdatedAt,
+                x.AssignedDeveloperId,
+                x.AssignedQaId,
+                x.OwnerId,
+                PrimaryAccountName = x.AccountPractice != null ? x.AccountPractice.Name : null,
+                DeveloperIds = x.WorkItemDevelopers.Select(link => link.TeamMemberId).ToList(),
+                LinkedAccountNames = x.WorkItemAccounts
+                    .Select(link => link.AccountPractice.Name)
+                    .ToList()
+            })
+            .AsNoTracking()
             .ToListAsync(cancellationToken);
 
         var now = DateTime.UtcNow;
@@ -245,7 +298,7 @@ public sealed class LeadDeskService(IDbContextFactory<LeadDeskDbContext> context
                     task.AssignedDeveloperId == member.Id ||
                     task.AssignedQaId == member.Id ||
                     task.OwnerId == member.Id ||
-                    task.WorkItemDevelopers.Any(link => link.TeamMemberId == member.Id))
+                    task.DeveloperIds.Contains(member.Id))
                 .DistinctBy(task => task.Id)
                 .ToList();
 
@@ -256,7 +309,9 @@ public sealed class LeadDeskService(IDbContextFactory<LeadDeskDbContext> context
             if (inProgress < 0) inProgress = 0;
 
             var accountNames = memberTasks
-                .SelectMany(TaskAccountNames)
+                .SelectMany(task => task.PrimaryAccountName == null
+                    ? task.LinkedAccountNames
+                    : task.LinkedAccountNames.Prepend(task.PrimaryAccountName))
                 .Where(name => !string.IsNullOrWhiteSpace(name))
                 .ToList();
             var primaryAccount = accountNames
@@ -284,10 +339,11 @@ public sealed class LeadDeskService(IDbContextFactory<LeadDeskDbContext> context
                     {
                         Id = task.Id,
                         Title = task.Title,
-                        AccountName = TaskAccountNames(task).FirstOrDefault() ?? "All accounts",
+                        AccountName = task.PrimaryAccountName ?? task.LinkedAccountNames.FirstOrDefault() ?? "All accounts",
                         Status = task.Status,
                         Priority = task.Priority,
-                        DueDate = task.DueDate
+                        DueDate = task.DueDate,
+                        IsImportant = task.IsImportant
                     })
                     .ToList()
             };
@@ -348,7 +404,7 @@ public sealed class LeadDeskService(IDbContextFactory<LeadDeskDbContext> context
             .ThenInclude(x => x.WorkItem)
             .AsNoTracking()
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
-        if (release != null) release.SelectedWorkItemIds = release.ReleaseWorkItems.Select(x => x.WorkItemId).ToList();
+        if (release != null) release.SelectedWorkItemIds = release.ReleaseWorkItems.OrderBy(x => x.SortOrder).Select(x => x.WorkItemId).ToList();
         return release;
     }
 
@@ -358,9 +414,8 @@ public sealed class LeadDeskService(IDbContextFactory<LeadDeskDbContext> context
         return await TaskGraph(db.WorkItems)
             .Where(x => !ArchivedStatuses.Contains(x.Status))
             .Where(x =>
+                QaStatuses.Contains(x.Status) ||
                 ReleaseCandidateStatuses.Contains(x.Status) ||
-                x.Type == "Deployment" ||
-                !string.IsNullOrWhiteSpace(x.ReleaseVersion) ||
                 x.ReleaseWorkItems.Any(r => ActiveReleaseStatuses.Contains(r.ReleasePlan.Status)))
             .OrderBy(x => ReleaseCandidateStatuses.Contains(x.Status) ? 0 : 1)
             .ThenBy(x => x.DueDate ?? DateTime.MaxValue)
@@ -372,9 +427,11 @@ public sealed class LeadDeskService(IDbContextFactory<LeadDeskDbContext> context
     public async Task<long> SaveReleasePlanAsync(ReleasePlan input, CancellationToken cancellationToken = default)
     {
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
         var item = input.Id == 0 ? new ReleasePlan() : await db.ReleasePlans.FindAsync([input.Id], cancellationToken) ?? throw new InvalidOperationException("Release plan not found.");
         item.Version = input.Version.Trim();
         if (string.IsNullOrWhiteSpace(item.Version)) throw new InvalidOperationException("Release version is required.");
+        if (input.SelectedWorkItemIds.Count == 0) throw new InvalidOperationException("Select at least one task for the release.");
         item.Status = input.Status;
         item.ReleaseDate = input.ReleaseDate;
         item.ReleaseNotes = input.ReleaseNotes;
@@ -385,8 +442,35 @@ public sealed class LeadDeskService(IDbContextFactory<LeadDeskDbContext> context
         await db.SaveChangesAsync(cancellationToken);
 
         await db.ReleaseWorkItems.Where(x => x.ReleasePlanId == item.Id).ExecuteDeleteAsync(cancellationToken);
-        db.ReleaseWorkItems.AddRange(input.SelectedWorkItemIds.Distinct().Select(id => new ReleaseWorkItem { ReleasePlanId = item.Id, WorkItemId = id }));
+        db.ReleaseWorkItems.AddRange(input.SelectedWorkItemIds
+            .Distinct()
+            .Select((id, index) => new ReleaseWorkItem { ReleasePlanId = item.Id, WorkItemId = id, SortOrder = index + 1 }));
         await db.SaveChangesAsync(cancellationToken);
+
+        if (item.Status == "Released" && input.SelectedWorkItemIds.Count > 0)
+        {
+            var tasks = await db.WorkItems
+                .Where(x => input.SelectedWorkItemIds.Contains(x.Id) && x.Status != "Released")
+                .ToListAsync(cancellationToken);
+            var releasedAt = DateTime.UtcNow;
+            foreach (var task in tasks)
+            {
+                var oldStatus = task.Status;
+                task.Status = "Released";
+                task.LatestUpdate = $"Released in {item.Version}.";
+                task.UpdatedAt = releasedAt;
+                db.WorkItemUpdates.Add(new WorkItemUpdate
+                {
+                    WorkItemId = task.Id,
+                    OldStatus = oldStatus,
+                    NewStatus = "Released",
+                    UpdateText = task.LatestUpdate
+                });
+            }
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
         return item.Id;
     }
 
@@ -400,7 +484,7 @@ public sealed class LeadDeskService(IDbContextFactory<LeadDeskDbContext> context
 
     private static void CopyTask(WorkItem source, WorkItem target)
     {
-        target.Title = source.Title; target.Description = source.Description; target.ModuleName = source.ModuleName; target.Type = source.Type; target.Priority = source.Priority; target.Status = source.Status; target.AssignedQaId = source.AssignedQaId; target.OwnerId = source.OwnerId; target.DueDate = source.DueDate; target.ReleaseVersion = source.ReleaseVersion; target.LatestUpdate = source.LatestUpdate; target.BlockerReason = source.BlockerReason; target.IsClientVisible = source.IsClientVisible;
+        target.Title = source.Title; target.Description = source.Description; target.ModuleName = source.ModuleName; target.Type = source.Type; target.Priority = source.Priority; target.Status = source.Status; target.AssignedQaId = source.AssignedQaId; target.OwnerId = source.OwnerId; target.DueDate = source.DueDate; target.ReleaseVersion = source.ReleaseVersion; target.LatestUpdate = source.LatestUpdate; target.BlockerReason = source.BlockerReason; target.IsClientVisible = source.IsClientVisible; target.IsImportant = source.IsImportant;
     }
 
     private static string AccountPriority(IReadOnlyCollection<WorkItem> tasks)

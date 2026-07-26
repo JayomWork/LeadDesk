@@ -76,6 +76,7 @@ public sealed class TeamMemberRecentTask
     public string Status { get; set; } = string.Empty;
     public string Priority { get; set; } = string.Empty;
     public DateTime? DueDate { get; set; }
+    public bool IsImportant { get; set; }
 }
 
 public sealed class AIWritingRequestDto
@@ -113,11 +114,14 @@ public interface IAIWritingService
 
 public interface ILeadDeskService
 {
+    event Action? ImportantTasksChanged;
     Task<DashboardSummary> GetDashboardAsync(CancellationToken cancellationToken = default);
     Task<List<WorkItem>> GetTasksAsync(TaskQuery query, CancellationToken cancellationToken = default);
     Task<WorkItem?> GetTaskAsync(long id, CancellationToken cancellationToken = default);
     Task<long> SaveTaskAsync(WorkItem item, CancellationToken cancellationToken = default);
     Task UpdateTaskStatusAsync(long id, string status, CancellationToken cancellationToken = default);
+    Task UpdateTaskImportanceAsync(long id, bool isImportant, CancellationToken cancellationToken = default);
+    Task<List<WorkItem>> GetImportantTasksAsync(CancellationToken cancellationToken = default);
     Task ArchiveTaskAsync(long id, CancellationToken cancellationToken = default);
     Task<List<AccountPractice>> GetAccountsAsync(string? search = null, CancellationToken cancellationToken = default);
     Task<List<AccountTaskSummary>> GetAccountTaskSummariesAsync(string? search = null, CancellationToken cancellationToken = default);

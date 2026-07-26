@@ -1,0 +1,32 @@
+<button type="button"
+        class="important-toggle @(IsImportant ? "active" : null)"
+        title="@(IsImportant ? "Remove from important tasks" : "Mark as important")"
+        aria-label="@(IsImportant ? "Remove from important tasks" : "Mark as important")"
+        disabled="@isSaving"
+        @onclick="Toggle">
+    <span aria-hidden="true">@(IsImportant ? "★" : "☆")</span>
+</button>
+
+@code {
+    [Parameter, EditorRequired] public long TaskId { get; set; }
+    [Parameter] public bool IsImportant { get; set; }
+    [Parameter] public EventCallback<bool> IsImportantChanged { get; set; }
+
+    private bool isSaving;
+
+    private async Task Toggle()
+    {
+        if (isSaving) return;
+        isSaving = true;
+        var value = !IsImportant;
+        try
+        {
+            await LeadDesk.UpdateTaskImportanceAsync(TaskId, value);
+            await IsImportantChanged.InvokeAsync(value);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

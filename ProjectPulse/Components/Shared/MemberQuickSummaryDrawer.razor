@@ -70,6 +70,7 @@
                 @foreach (var task in DisplayTasks)
                 {
                     <div class="drawer-task-row">
+                        <ImportantTaskButton TaskId="task.Id" IsImportant="task.IsImportant" IsImportantChanged="value => task.IsImportant = value" />
                         <div>
                             <strong>@task.Title</strong>
                             <small>@task.AccountName</small>

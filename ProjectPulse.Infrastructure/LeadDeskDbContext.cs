@@ -23,6 +23,7 @@ public class LeadDeskDbContext(DbContextOptions<LeadDeskDbContext> options) : Id
         base.OnModelCreating(builder);
         builder.Entity<AccountPractice>().HasIndex(x => x.Name);
         builder.Entity<WorkItem>().HasIndex(x => new { x.Status, x.Priority });
+        builder.Entity<WorkItem>().HasIndex(x => new { x.IsImportant, x.UpdatedAt });
         builder.Entity<WorkItem>().HasIndex(x => x.DueDate);
         builder.Entity<WorkItem>().HasQueryFilter(x => !x.IsDeleted);
         builder.Entity<WorkItemAttachment>().HasIndex(x => new { x.WorkItemId, x.CreatedAt });

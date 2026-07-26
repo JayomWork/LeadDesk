@@ -1,0 +1,91 @@
+@implements IDisposable
+@rendermode InteractiveServer
+
+<div class="important-menu-wrap">
+    <button type="button" class="important-menu-trigger" @onclick="TogglePopup" aria-expanded="@isOpen">
+        <span aria-hidden="true">★</span>
+        <span>Important</span>
+        @if (items.Count > 0)
+        {
+            <strong>@items.Count</strong>
+        }
+    </button>
+
+    @if (isOpen)
+    {
+        <div class="important-popup">
+            <div class="important-popup-head">
+                <div><span class="eyebrow">Quick access</span><h2>Important tasks</h2></div>
+                <button type="button" class="icon-button" @onclick="TogglePopup" title="Close">×</button>
+            </div>
+
+            @if (isLoading)
+            {
+                <div class="important-popup-state">Loading important tasks…</div>
+            }
+            else if (items.Count == 0)
+            {
+                <div class="important-popup-state">No important tasks yet. Select ☆ beside any task.</div>
+            }
+            else
+            {
+                <div class="important-popup-list">
+                    @foreach (var item in items)
+                    {
+                        <div class="important-popup-row">
+                            <ImportantTaskButton TaskId="item.Id" IsImportant="item.IsImportant" IsImportantChanged="value => FlagChanged(item, value)" />
+                            <a href="tasks/@item.Id" @onclick="Close">
+                                <strong>@item.Title</strong>
+                                <small>@AccountName(item) · @item.Status @if (item.DueDate.HasValue) { <text>· Due @item.DueDate.Value.ToString("dd MMM")</text> }</small>
+                            </a>
+                        </div>
+                    }
+                </div>
+            }
+
+            <a class="important-popup-footer" href="tasks" @onclick="Close">Open all tasks →</a>
+        </div>
+    }
+</div>
+
+@code {
+    private List<WorkItem> items = [];
+    private bool isOpen;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        LeadDesk.ImportantTasksChanged += HandleImportantTasksChanged;
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        isLoading = true;
+        items = await LeadDesk.GetImportantTasksAsync();
+        isLoading = false;
+    }
+
+    private async Task TogglePopup()
+    {
+        isOpen = !isOpen;
+        if (isOpen) await Load();
+    }
+
+    private void HandleImportantTasksChanged() => _ = InvokeAsync(Load);
+
+    private void FlagChanged(WorkItem item, bool value)
+    {
+        item.IsImportant = value;
+        if (!value) items.Remove(item);
+    }
+
+    private void Close() => isOpen = false;
+
+    private static string AccountName(WorkItem item) =>
+        item.WorkItemAccounts.Select(x => x.AccountPractice.Name).FirstOrDefault()
+        ?? item.AccountPractice?.Name
+        ?? "All accounts";
+
+    public void Dispose() => LeadDesk.ImportantTasksChanged -= HandleImportantTasksChanged;
+}

@@ -26,6 +26,23 @@ builder.Services.ConfigureApplicationCookie(options =>
 builder.Services.AddCascadingAuthenticationState();
 
 var app = builder.Build();
+await using (var scope = app.Services.CreateAsyncScope())
+{
+    var dbFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<LeadDeskDbContext>>();
+    await using var db = await dbFactory.CreateDbContextAsync();
+    await db.Database.ExecuteSqlRawAsync("""
+        IF COL_LENGTH('WorkItems', 'IsImportant') IS NULL
+        BEGIN
+            ALTER TABLE [WorkItems] ADD [IsImportant] bit NOT NULL CONSTRAINT [DF_WorkItems_IsImportant] DEFAULT 0;
+            CREATE INDEX [IX_WorkItems_IsImportant_UpdatedAt] ON [WorkItems] ([IsImportant], [UpdatedAt]);
+        END
+
+        IF COL_LENGTH('ReleaseWorkItems', 'SortOrder') IS NULL
+        BEGIN
+            ALTER TABLE [ReleaseWorkItems] ADD [SortOrder] int NOT NULL CONSTRAINT [DF_ReleaseWorkItems_SortOrder] DEFAULT 0;
+        END
+        """);
+}
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);

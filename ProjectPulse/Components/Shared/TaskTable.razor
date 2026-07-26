@@ -14,7 +14,10 @@ else
                 {
                     <tr class="@RowClass(item)">
                         <td>
-                            <a class="task-title" href="tasks/@item.Id">@item.Title</a>
+                            <div class="task-title-row">
+                                <ImportantTaskButton TaskId="item.Id" IsImportant="item.IsImportant" IsImportantChanged="value => item.IsImportant = value" />
+                                <a class="task-title" href="tasks/@item.Id">@item.Title</a>
+                            </div>
                             <small>
                                 @item.ModuleName - @item.Type
                                 @if (PlannedRelease(item) is { } release)

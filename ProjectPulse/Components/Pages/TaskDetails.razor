@@ -15,7 +15,10 @@ else
             <h1>@item.Title</h1>
             <div class="inline-meta"><span class="priority priority-@Key(item.Priority)">@item.Priority</span><span>@item.Status</span><span>Due @DueDateText</span>@if (PlannedRelease is { } release) { <span class="release-chip">@release</span> }</div>
         </div>
-        <a class="secondary-button" href="tasks/@Id/edit">Edit task</a>
+        <div class="page-heading-actions">
+            <ImportantTaskButton TaskId="item.Id" IsImportant="item.IsImportant" IsImportantChanged="value => item.IsImportant = value" />
+            <a class="secondary-button" href="tasks/@Id/edit">Edit task</a>
+        </div>
     </div>
     <div class="detail-grid">
         <section class="surface">

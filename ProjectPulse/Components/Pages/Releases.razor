@@ -1,10 +1,11 @@
 @page "/releases"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@inject IJSRuntime JS
 <PageTitle>Releases - ProjectPulse</PageTitle>
 
 <div class="page-heading">
-    <div><span class="eyebrow">Release planning</span><h1>Releases</h1><p>Select QA-done and release-ready tasks into a sprint or planned release.</p></div>
+    <div><span class="eyebrow">Release planning</span><h1>Releases</h1><p>Choose QA-ready tasks, arrange the release list, set a planned date, and release them together.</p></div>
 </div>
 
 @if (isLoading)
@@ -21,31 +22,106 @@ else
             <div class="form-error">@errorMessage</div>
         }
 
-        <section class="surface form-surface wide-form">
+        <section class="surface release-editor">
             <div class="section-head">
-                <div><span class="eyebrow">Plan release</span><h2>New sprint / release</h2></div>
-                <button class="secondary-button small" type="button" @onclick="SelectCandidates">Select candidates</button>
+                <div>
+                    <span class="eyebrow">@(model.Id == 0 ? "New plan" : "Editing release")</span>
+                    <h2>@(model.Id == 0 ? "Plan a sprint / release" : $"Edit {model.Version}")</h2>
+                </div>
+                @if (model.Id != 0)
+                {
+                    <button class="secondary-button small" type="button" @onclick="NewPlan">Cancel edit</button>
+                }
             </div>
-            <div class="form-grid">
-                <div class="field"><label>Version / sprint</label><InputText class="input" required @bind-Value="model.Version" /></div>
+
+            <div class="release-fields">
+                <div class="field"><label>Version / sprint name</label><InputText class="input" required @bind-Value="model.Version" /></div>
                 <div class="field"><label>Planned release date</label><InputDate class="input" @bind-Value="model.ReleaseDate" /></div>
-                <div class="field"><label>Status</label><InputSelect class="input select-input" @bind-Value="model.Status">@foreach (var status in LeadDeskOptions.ReleaseStatuses) { <option>@status</option> }</InputSelect></div>
-                <label class="check field"><InputCheckbox @bind-Value="model.QaSignedOff" /> QA signed off</label>
-                <label class="check field"><InputCheckbox @bind-Value="model.ClientSignedOff" /> Client signed off</label>
-                <div class="field full"><label>Tasks</label><MultiSelect Options="candidateOptions" @bind-Selected="model.SelectedWorkItemIds" Placeholder="Select release tasks" SearchPlaceholder="Search release tasks..." /></div>
-                <div class="field full"><label>Release notes</label><InputTextArea class="input textarea" @bind-Value="model.ReleaseNotes" /></div>
+                <div class="field"><label>Release status</label><InputSelect class="input select-input" @bind-Value="model.Status">@foreach (var status in LeadDeskOptions.ReleaseStatuses) { <option>@status</option> }</InputSelect></div>
             </div>
-            <div class="form-actions"><button class="primary-button" type="submit" disabled="@isSaving">@(isSaving ? "Saving..." : "Create release")</button></div>
+
+            <div class="release-planner-grid">
+                <section class="release-task-picker">
+                    <div class="release-box-head">
+                        <div><h3>QA-ready tasks</h3><p>Select tasks to include in this release.</p></div>
+                        <span class="task-count">@availableTasks.Count task@(availableTasks.Count == 1 ? "" : "s")</span>
+                    </div>
+                    @if (availableTasks.Count == 0)
+                    {
+                        <div class="release-empty">No tasks currently have a QA-related status.</div>
+                    }
+                    else
+                    {
+                        <div class="release-checkbox-list">
+                            @foreach (var task in availableTasks)
+                            {
+                                <label class="release-checkbox-row">
+                                    <input type="checkbox" checked="@IsSelected(task.Id)" @onchange="e => SetSelected(task.Id, e.Value is true)" />
+                                    <span>
+                                        <strong>@task.Title</strong>
+                                        <small>@TaskAccount(task) · @task.Status</small>
+                                    </span>
+                                    <span class="priority priority-@task.Priority.ToLowerInvariant()">@task.Priority</span>
+                                </label>
+                            }
+                        </div>
+                    }
+                </section>
+
+                <section class="release-selected-box">
+                    <div class="release-box-head">
+                        <div><h3>Release task list</h3><p>Tasks will be saved in this numbered list.</p></div>
+                        <div class="release-list-tools">
+                            <button type="button" class="secondary-button small" disabled="@(SelectedTasks.Count == 0)" @onclick="CopyQaList">@copyButtonText</button>
+                            <strong class="release-number">@SelectedTasks.Count</strong>
+                        </div>
+                    </div>
+                    @if (SelectedTasks.Count == 0)
+                    {
+                        <div class="release-empty">Choose tasks from the QA-ready list.</div>
+                    }
+                    else
+                    {
+                        <ol class="release-numbered-list">
+                            @for (var index = 0; index < SelectedTasks.Count; index++)
+                            {
+                                var task = SelectedTasks[index];
+                                var taskIndex = index;
+                                <li>
+                                    <div><strong>@task.Title</strong><small>@task.Status</small></div>
+                                    <div class="release-order-actions">
+                                        <button type="button" class="sequence-button" title="Move up" disabled="@(taskIndex == 0)" @onclick="() => MoveTask(taskIndex, -1)">↑</button>
+                                        <button type="button" class="sequence-button" title="Move down" disabled="@(taskIndex == SelectedTasks.Count - 1)" @onclick="() => MoveTask(taskIndex, 1)">↓</button>
+                                        <button type="button" class="icon-button" title="Remove from release" @onclick="() => RemoveTask(task.Id)">×</button>
+                                    </div>
+                                </li>
+                            }
+                        </ol>
+                    }
+                </section>
+            </div>
+
+            <div class="release-more-fields">
+                <label class="check"><InputCheckbox @bind-Value="model.QaSignedOff" /> QA signed off</label>
+                <label class="check"><InputCheckbox @bind-Value="model.ClientSignedOff" /> Client signed off</label>
+                <div class="field full"><label>Release notes</label><InputTextArea class="input compact-textarea" @bind-Value="model.ReleaseNotes" /></div>
+            </div>
+
+            @if (model.Status == "Released")
+            {
+                <div class="release-warning">Saving as Released will automatically change every selected task to Released.</div>
+            }
+
+            <div class="form-actions">
+                <button class="primary-button" type="submit" disabled="@(isSaving || SelectedTasks.Count == 0)">
+                    @(isSaving ? "Saving..." : model.Id == 0 ? "Save release plan" : "Update release plan")
+                </button>
+            </div>
         </section>
     </EditForm>
 
     <section class="surface">
-        <div class="section-head"><div><span class="eyebrow">Auto populated</span><h2>Release candidate tasks</h2></div><span class="task-count">@candidateTasks.Count task@(candidateTasks.Count == 1 ? "" : "s")</span></div>
-        <TaskTable Items="candidateTasks" OnStatusChanged="ChangeStatus" />
-    </section>
-
-    <section class="surface">
-        <div class="section-head"><div><span class="eyebrow">History</span><h2>Release plans</h2></div></div>
+        <div class="section-head"><div><span class="eyebrow">Saved plans</span><h2>Release history</h2></div></div>
         @if (releasePlans.Count == 0)
         {
             <EmptyState Title="No releases yet" Message="Create your first release plan above." />
@@ -60,21 +136,22 @@ else
                             <div>
                                 <span class="status-label">@release.Status</span>
                                 <h2>@release.Version</h2>
-                                <p>@(release.ReleaseDate?.ToString("dd MMM yyyy") ?? "No release date")</p>
+                                <p>@(release.ReleaseDate?.ToString("dd MMM yyyy") ?? "No release date") · @release.ReleaseWorkItems.Count task@(release.ReleaseWorkItems.Count == 1 ? "" : "s")</p>
                             </div>
                             <div class="release-actions">
                                 @if (release.QaSignedOff) { <span class="status-label signed">QA signed</span> }
                                 @if (release.ClientSignedOff) { <span class="status-label signed">Client signed</span> }
+                                <button type="button" class="secondary-button small" @onclick="() => Edit(release)">Edit</button>
                             </div>
                         </div>
                         @if (release.ReleaseWorkItems.Count > 0)
                         {
-                            <div class="release-tasks">
-                                @foreach (var link in release.ReleaseWorkItems.OrderBy(x => x.WorkItem.Title))
+                            <ol class="release-history-tasks">
+                                @foreach (var link in release.ReleaseWorkItems.OrderBy(x => x.SortOrder))
                                 {
-                                    <a href="tasks/@link.WorkItemId">@link.WorkItem.Title <span>@link.WorkItem.Status</span></a>
+                                    <li><a href="tasks/@link.WorkItemId">@link.WorkItem.Title</a><span>@link.WorkItem.Status</span></li>
                                 }
-                            </div>
+                            </ol>
                         }
                     </article>
                 }
@@ -86,11 +163,17 @@ else
 @code {
     private ReleasePlan model = NewReleasePlan();
     private List<ReleasePlan> releasePlans = [];
-    private List<WorkItem> candidateTasks = [];
-    private List<LookupOption> candidateOptions = [];
+    private List<WorkItem> availableTasks = [];
     private bool isLoading = true;
     private bool isSaving;
     private string? errorMessage;
+    private string copyButtonText = "Copy QA list";
+
+    private List<WorkItem> SelectedTasks => model.SelectedWorkItemIds
+        .Select(id => availableTasks.FirstOrDefault(task => task.Id == id))
+        .Where(task => task != null)
+        .Select(task => task!)
+        .ToList();
 
     protected override async Task OnInitializedAsync() => await Load();
 
@@ -98,13 +181,75 @@ else
     {
         isLoading = true;
         releasePlans = await LeadDesk.GetReleasePlansAsync();
-        candidateTasks = await LeadDesk.GetReleaseCandidateTasksAsync();
-        candidateOptions = candidateTasks.Select(x => new LookupOption(x.Id, $"{x.Title} [{x.Status}]")).ToList();
-        if (model.Id == 0 && model.SelectedWorkItemIds.Count == 0) SelectCandidates();
+        availableTasks = await LeadDesk.GetReleaseCandidateTasksAsync();
         isLoading = false;
     }
 
-    private void SelectCandidates() => model.SelectedWorkItemIds = candidateTasks.Select(x => x.Id).ToList();
+    private bool IsSelected(long taskId) => model.SelectedWorkItemIds.Contains(taskId);
+
+    private void SetSelected(long taskId, bool selected)
+    {
+        if (selected && !model.SelectedWorkItemIds.Contains(taskId)) model.SelectedWorkItemIds.Add(taskId);
+        if (!selected) model.SelectedWorkItemIds.Remove(taskId);
+    }
+
+    private void RemoveTask(long taskId) => model.SelectedWorkItemIds.Remove(taskId);
+
+    private void MoveTask(int index, int direction)
+    {
+        var newIndex = index + direction;
+        if (index < 0 || index >= model.SelectedWorkItemIds.Count || newIndex < 0 || newIndex >= model.SelectedWorkItemIds.Count) return;
+        (model.SelectedWorkItemIds[index], model.SelectedWorkItemIds[newIndex]) =
+            (model.SelectedWorkItemIds[newIndex], model.SelectedWorkItemIds[index]);
+    }
+
+    private async Task CopyQaList()
+    {
+        if (SelectedTasks.Count == 0) return;
+        var heading = $"QA Testing Sequence - {model.Version}";
+        var date = model.ReleaseDate.HasValue ? $"Planned release: {model.ReleaseDate.Value:dd MMM yyyy}" : "Planned release: Not set";
+        var lines = SelectedTasks.Select((task, index) =>
+            $"{index + 1}. {task.Title} | Priority: {task.Priority} | Account: {TaskAccount(task)} | Status: {task.Status}");
+        var text = string.Join(Environment.NewLine, new[] { heading, date, string.Empty }.Concat(lines));
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", text);
+            copyButtonText = "Copied!";
+            await Task.Delay(1500);
+            copyButtonText = "Copy QA list";
+        }
+        catch
+        {
+            errorMessage = "The browser could not copy the list. Please allow clipboard access and try again.";
+        }
+    }
+
+    private void Edit(ReleasePlan release)
+    {
+        foreach (var linkedTask in release.ReleaseWorkItems.Select(link => link.WorkItem))
+        {
+            if (availableTasks.All(task => task.Id != linkedTask.Id)) availableTasks.Add(linkedTask);
+        }
+
+        model = new ReleasePlan
+        {
+            Id = release.Id,
+            Version = release.Version,
+            Status = release.Status,
+            ReleaseDate = release.ReleaseDate,
+            ReleaseNotes = release.ReleaseNotes,
+            QaSignedOff = release.QaSignedOff,
+            ClientSignedOff = release.ClientSignedOff,
+            SelectedWorkItemIds = release.ReleaseWorkItems.OrderBy(link => link.SortOrder).Select(link => link.WorkItemId).ToList()
+        };
+        errorMessage = null;
+    }
+
+    private void NewPlan()
+    {
+        model = NewReleasePlan();
+        errorMessage = null;
+    }
 
     private async Task Save()
     {
@@ -126,12 +271,10 @@ else
         }
     }
 
-    private async Task ChangeStatus((WorkItem Item, string Status) change)
-    {
-        await LeadDesk.UpdateTaskStatusAsync(change.Item.Id, change.Status);
-        model.SelectedWorkItemIds = [];
-        await Load();
-    }
+    private static string TaskAccount(WorkItem task) =>
+        task.WorkItemAccounts.Select(link => link.AccountPractice.Name).FirstOrDefault()
+        ?? task.AccountPractice?.Name
+        ?? "All accounts";
 
     private static ReleasePlan NewReleasePlan() => new()
     {
