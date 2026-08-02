@@ -71,7 +71,7 @@
                 {
                     <div class="drawer-task-row">
                         <ImportantTaskButton TaskId="task.Id" IsImportant="task.IsImportant" IsImportantChanged="value => task.IsImportant = value" />
-                        <div>
+                        <div class="drawer-task-content">
                             <strong>@task.Title</strong>
                             <small>@task.AccountName</small>
                             @if (task.DueDate.HasValue)
