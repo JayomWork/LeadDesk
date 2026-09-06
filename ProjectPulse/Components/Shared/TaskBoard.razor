@@ -1,0 +1,343 @@
+@inject IJSRuntime JS
+
+<div class="board-scroll-top" @ref="topScroll" aria-label="Scroll board columns">
+    <div class="board-scroll-spacer" @ref="topScrollSpacer"></div>
+</div>
+<div class="task-board" @ref="boardScroll" aria-label="Task board grouped by @GroupBy">
+    @foreach (var column in Columns)
+    {
+        var columnItems = ItemsFor(column);
+        <section class="board-column @column.ColorClass @(dropKey == column.Key ? "is-drop-target" : null)"
+                 @ondragenter="() => dropKey = column.Key"
+                 @ondragleave="() => LeaveColumn(column.Key)"
+                 @ondragover:preventDefault="true"
+                 @ondrop="() => Drop(column)">
+            <header class="board-column-head">
+                <span class="board-dot @column.ColorClass"></span>
+                <strong>@column.Name</strong>
+                <div class="board-column-actions">
+                    <span class="board-count">@columnItems.Count</span>
+                    <button type="button" class="board-column-add" title="Add task to @column.Name" aria-label="Add task to @column.Name" @onclick="() => BeginQuickAdd(column, true)">+</button>
+                </div>
+            </header>
+            <div class="board-card-list">
+                @foreach (var item in columnItems)
+                {
+                    <article class="board-card @(draggedTaskId == item.Id ? "is-dragging" : null)"
+                             draggable="@(editingTaskId != item.Id)"
+                             @ondragstart="() => StartDrag(item.Id)"
+                             @ondragend="EndDrag">
+                        @if (editingTaskId == item.Id)
+                        {
+                            <div class="board-quick-edit" @onclick:stopPropagation="true">
+                                <input class="input" placeholder="Task title" maxlength="250" @bind="editTitle" @bind:event="oninput" />
+                                <select class="input select-input" @bind="editStatus">
+                                    @foreach (var status in LeadDeskOptions.Statuses) { <option value="@status">@status</option> }
+                                </select>
+                                <select class="input select-input" @bind="editTeamMemberId">
+                                    <option value="">Unassigned</option>
+                                    @foreach (var member in Team) { <option value="@member.Id">@member.FullName</option> }
+                                </select>
+                                <div class="board-edit-fields">
+                                    <select class="input select-input" @bind="editPriority">
+                                        @foreach (var priority in LeadDeskOptions.Priorities) { <option value="@priority">@priority</option> }
+                                    </select>
+                                    <InputDate class="input" @bind-Value="editDueDate" />
+                                </div>
+                                @if (!string.IsNullOrWhiteSpace(editError))
+                                {
+                                    <small class="board-quick-error">@editError</small>
+                                }
+                                <div class="board-quick-actions">
+                                    <button type="button" class="primary-button small" disabled="@isEditing" @onclick="SaveQuickEdit">@(isEditing ? "Saving..." : "Save")</button>
+                                    <button type="button" class="secondary-button small" disabled="@isEditing" @onclick="CancelQuickEdit">Cancel</button>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                        <div class="board-card-top">
+                            <span class="board-type">@item.Type</span>
+                            <div class="board-card-tools">
+                                <ImportantTaskButton TaskId="item.Id" IsImportant="item.IsImportant" IsImportantChanged="value => item.IsImportant = value" />
+                                <button type="button" class="board-edit-button" title="Quick edit task" aria-label="Quick edit @item.Title" @onclick="() => BeginQuickEdit(item)">
+                                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l11-11-4-4L4 16v4zm9.5-13.5 4 4M14 6l2-2a1.4 1.4 0 0 1 2 0l2 2a1.4 1.4 0 0 1 0 2l-2 2" /></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <a class="board-card-title" href="tasks/@item.Id">@item.Title</a>
+                        <div class="board-card-meta">
+                            <span title="Account">Account: @AccountNames(item)</span>
+                            @if (item.DueDate.HasValue)
+                            {
+                                <span class="@(IsOverdue(item) ? "overdue" : null)" title="Due date">Due: @item.DueDate.Value.ToString("dd MMM")</span>
+                            }
+                        </div>
+                        <footer class="board-card-footer">
+                            <div class="board-avatars" title="Assigned team members">
+                                @if (Developers(item).Any())
+                                {
+                                    @foreach (var developer in Developers(item).Take(3))
+                                    {
+                                        <span title="@developer.FullName">@Initial(developer.FullName)</span>
+                                    }
+                                }
+                                else
+                                {
+                                    <span class="unassigned" title="Unassigned">?</span>
+                                }
+                            </div>
+                            <span class="priority priority-@Key(item.Priority)">@item.Priority</span>
+                        </footer>
+                        }
+                    </article>
+                }
+
+                @if (columnItems.Count == 0 && quickAddColumnKey != column.Key)
+                {
+                    <div class="board-empty">Drop a task here</div>
+                }
+
+                @if (quickAddColumnKey == column.Key)
+                {
+                    <div class="board-quick-add @(quickAddAtTop ? "is-top" : null)" @onclick:stopPropagation="true">
+                        <input class="input" placeholder="Task title" maxlength="250" @bind="draftTitle" @bind:event="oninput" @onkeydown="QuickAddKeyDown" />
+                        @if (GroupBy == "Person")
+                        {
+                            <select class="input select-input" @bind="draftStatus">
+                                @foreach (var status in LeadDeskOptions.Statuses) { <option value="@status">@status</option> }
+                            </select>
+                        }
+                        else
+                        {
+                            <select class="input select-input" @bind="draftTeamMemberId">
+                                <option value="">Unassigned</option>
+                                @foreach (var member in Team) { <option value="@member.Id">@member.FullName</option> }
+                            </select>
+                        }
+                        <select class="input select-input" @bind="draftPriority">
+                            @foreach (var priority in LeadDeskOptions.Priorities) { <option value="@priority">@priority priority</option> }
+                        </select>
+                        @if (!string.IsNullOrWhiteSpace(quickAddError))
+                        {
+                            <small class="board-quick-error">@quickAddError</small>
+                        }
+                        <div class="board-quick-actions">
+                            <button type="button" class="primary-button small" disabled="@isSaving" @onclick="() => SaveQuickTask(column)">@(isSaving ? "Adding..." : "Add task")</button>
+                            <button type="button" class="secondary-button small" disabled="@isSaving" @onclick="CancelQuickAdd">Cancel</button>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <button type="button" class="board-add-button" @onclick="() => BeginQuickAdd(column, false)">+ Add task</button>
+                }
+            </div>
+        </section>
+    }
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<WorkItem> Items { get; set; } = [];
+    [Parameter] public IReadOnlyList<TeamMember> Team { get; set; } = [];
+    [Parameter] public string GroupBy { get; set; } = "Status";
+    [Parameter] public EventCallback<(WorkItem Item, string Status)> OnStatusChanged { get; set; }
+    [Parameter] public EventCallback<(WorkItem Item, long? TeamMemberId)> OnAssigneeChanged { get; set; }
+    [Parameter] public EventCallback<WorkItem> OnTaskCreated { get; set; }
+    [Parameter] public EventCallback<BoardTaskUpdate> OnTaskEdited { get; set; }
+
+    private long? draggedTaskId;
+    private string? dropKey;
+    private string? quickAddColumnKey;
+    private bool quickAddAtTop;
+    private string draftTitle = string.Empty;
+    private string draftStatus = "New";
+    private string draftPriority = "Medium";
+    private long? draftTeamMemberId;
+    private bool isSaving;
+    private string? quickAddError;
+    private long? editingTaskId;
+    private string editTitle = string.Empty;
+    private string editStatus = "New";
+    private string editPriority = "Medium";
+    private long? editTeamMemberId;
+    private DateTime? editDueDate;
+    private bool isEditing;
+    private string? editError;
+    private ElementReference topScroll;
+    private ElementReference topScrollSpacer;
+    private ElementReference boardScroll;
+    private string? connectedScrollGroup;
+
+    private IReadOnlyList<BoardColumn> Columns => GroupBy == "Person"
+        ? [new("unassigned", "Unassigned", null, "neutral"), .. Team.Select(x => new BoardColumn($"person-{x.Id}", x.FullName, x.Id, "person"))]
+        : LeadDeskOptions.Statuses.Select(x => new BoardColumn($"status-{Key(x)}", x, x, $"status-dot-{Key(x)}")).ToList();
+
+    protected override void OnParametersSet()
+    {
+        if (quickAddColumnKey != null && Columns.All(x => x.Key != quickAddColumnKey)) CancelQuickAdd();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender && connectedScrollGroup == GroupBy) return;
+        connectedScrollGroup = GroupBy;
+        await JS.InvokeVoidAsync("leadDeskBoardScroll.connect", topScroll, boardScroll, topScrollSpacer);
+    }
+
+    private List<WorkItem> ItemsFor(BoardColumn column) => GroupBy == "Person"
+        ? Items.Where(x => column.Value == null ? !Developers(x).Any() : Developers(x).Any(d => d.Id == (long)column.Value)).ToList()
+        : Items.Where(x => x.Status == (string)column.Value!).ToList();
+
+    private void StartDrag(long id) => draggedTaskId = id;
+    private void EndDrag() { draggedTaskId = null; dropKey = null; }
+    private void LeaveColumn(string key) { if (dropKey == key) dropKey = null; }
+
+    private void BeginQuickAdd(BoardColumn column, bool atTop)
+    {
+        CancelQuickEdit();
+        quickAddColumnKey = column.Key;
+        quickAddAtTop = atTop;
+        draftTitle = string.Empty;
+        draftPriority = "Medium";
+        draftStatus = GroupBy == "Status" ? (string)column.Value! : "New";
+        draftTeamMemberId = GroupBy == "Person" ? column.Value as long? : null;
+        quickAddError = null;
+    }
+
+    private void BeginQuickEdit(WorkItem item)
+    {
+        CancelQuickAdd();
+        editingTaskId = item.Id;
+        editTitle = item.Title;
+        editStatus = item.Status;
+        editPriority = item.Priority;
+        editTeamMemberId = Developers(item).FirstOrDefault()?.Id;
+        editDueDate = item.DueDate;
+        editError = null;
+    }
+
+    private void CancelQuickEdit()
+    {
+        editingTaskId = null;
+        editError = null;
+    }
+
+    private async Task SaveQuickEdit()
+    {
+        if (!editingTaskId.HasValue || string.IsNullOrWhiteSpace(editTitle))
+        {
+            editError = "Enter a task title.";
+            return;
+        }
+
+        try
+        {
+            isEditing = true;
+            editError = null;
+            await OnTaskEdited.InvokeAsync(new BoardTaskUpdate
+            {
+                Id = editingTaskId.Value,
+                Title = editTitle,
+                Status = editStatus,
+                Priority = editPriority,
+                TeamMemberId = editTeamMemberId,
+                DueDate = editDueDate
+            });
+            CancelQuickEdit();
+        }
+        catch (Exception ex)
+        {
+            editError = ex.Message;
+        }
+        finally
+        {
+            isEditing = false;
+        }
+    }
+
+    private void CancelQuickAdd()
+    {
+        quickAddColumnKey = null;
+        quickAddError = null;
+    }
+
+    private async Task QuickAddKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key != "Enter" || quickAddColumnKey == null) return;
+        var column = Columns.FirstOrDefault(x => x.Key == quickAddColumnKey);
+        if (column != null) await SaveQuickTask(column);
+    }
+
+    private async Task SaveQuickTask(BoardColumn column)
+    {
+        if (string.IsNullOrWhiteSpace(draftTitle))
+        {
+            quickAddError = "Enter a task title.";
+            return;
+        }
+
+        try
+        {
+            isSaving = true;
+            quickAddError = null;
+            var item = new WorkItem
+            {
+                Title = draftTitle.Trim(),
+                Type = "Requirement",
+                Status = GroupBy == "Status" ? (string)column.Value! : draftStatus,
+                Priority = draftPriority,
+                SelectedDeveloperIds = draftTeamMemberId.HasValue ? [draftTeamMemberId.Value] : []
+            };
+            item.AssignedDeveloperId = draftTeamMemberId;
+            await OnTaskCreated.InvokeAsync(item);
+            CancelQuickAdd();
+        }
+        catch (Exception ex)
+        {
+            quickAddError = ex.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task Drop(BoardColumn column)
+    {
+        var item = Items.FirstOrDefault(x => x.Id == draggedTaskId);
+        EndDrag();
+        if (item == null) return;
+        if (GroupBy == "Person")
+        {
+            var memberId = column.Value as long?;
+            if (Developers(item).Count() == 1 && Developers(item).First().Id == memberId) return;
+            await OnAssigneeChanged.InvokeAsync((item, memberId));
+        }
+        else
+        {
+            var status = (string)column.Value!;
+            if (item.Status == status) return;
+            await OnStatusChanged.InvokeAsync((item, status));
+        }
+    }
+
+    private static IEnumerable<TeamMember> Developers(WorkItem item)
+    {
+        var linked = item.WorkItemDevelopers.Select(x => x.TeamMember).Where(x => x != null).ToList();
+        if (linked.Count == 0 && item.AssignedDeveloper != null) linked.Add(item.AssignedDeveloper);
+        return linked.DistinctBy(x => x.Id);
+    }
+
+    private static string AccountNames(WorkItem item)
+    {
+        var names = item.WorkItemAccounts.Select(x => x.AccountPractice.Name).ToList();
+        if (names.Count == 0 && item.AccountPractice != null) names.Add(item.AccountPractice.Name);
+        return names.Count == 0 ? "All accounts" : string.Join(", ", names);
+    }
+
+    private static bool IsOverdue(WorkItem item) => item.DueDate?.Date < DateTime.Today && item.Status is not "Released" and not "Completed" and not "Cancelled";
+    private static string Initial(string value) => string.IsNullOrWhiteSpace(value) ? "?" : value.Trim()[..1].ToUpperInvariant();
+    private static string Key(string value) => value.ToLowerInvariant().Replace(" ", "-");
+    private sealed record BoardColumn(string Key, string Name, object? Value, string ColorClass);
+}

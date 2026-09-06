@@ -13,9 +13,10 @@ else
         <div>
             <span class="eyebrow">@item.Type - @item.ModuleName</span>
             <h1>@item.Title</h1>
-            <div class="inline-meta"><span class="priority priority-@Key(item.Priority)">@item.Priority</span><span>@item.Status</span><span>Due @DueDateText</span>@if (PlannedRelease is { } release) { <span class="release-chip">@release</span> }</div>
+            <div class="inline-meta"><span class="priority priority-@Key(item.Priority)">@item.Priority</span><span class="status-label status-@Key(item.Status)">@item.Status</span><span>Due @DueDateText</span>@if (PlannedRelease is { } release) { <span class="release-chip">@release</span> }</div>
         </div>
         <div class="page-heading-actions">
+            <a class="secondary-button" href="tasks">Back to Tasks</a>
             <ImportantTaskButton TaskId="item.Id" IsImportant="item.IsImportant" IsImportantChanged="value => item.IsImportant = value" />
             <a class="secondary-button" href="tasks/@Id/edit">Edit task</a>
         </div>

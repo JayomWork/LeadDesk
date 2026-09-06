@@ -6,6 +6,7 @@
 
 <div class="page-heading task-page-heading">
     <div><span class="eyebrow">@(Id == 0 ? "Create" : "Update")</span><h1>@(Id == 0 ? "New Task" : "Edit Task")</h1><p>Create and assign a client/account task.</p></div>
+    <a class="secondary-button" href="@(Id == 0 ? "tasks" : $"tasks/{Id}")">@(Id == 0 ? "Back to Tasks" : "Back to task")</a>
 </div>
 
 @if (isLoading)

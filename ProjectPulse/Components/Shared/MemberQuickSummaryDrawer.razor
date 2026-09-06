@@ -80,7 +80,7 @@
                             }
                         </div>
                         <div class="drawer-task-badges">
-                            <span class="status-label">@task.Status</span>
+                            <span class="status-label status-@Key(task.Status)">@task.Status</span>
                             <span class="priority priority-@task.Priority.ToLowerInvariant()">@task.Priority</span>
                         </div>
                     </div>
@@ -109,4 +109,5 @@
 
     private async Task Close() => await OnClose.InvokeAsync();
     private static string Initial(string value) => string.IsNullOrWhiteSpace(value) ? "?" : value.Trim()[..1].ToUpperInvariant();
+    private static string Key(string value) => value.ToLowerInvariant().Replace(" ", "-");
 }

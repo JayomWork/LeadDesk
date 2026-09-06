@@ -134,7 +134,7 @@ else
                     <article class="release-card @(release.Status == "Released" ? "released" : null)">
                         <div class="release-main">
                             <div>
-                                <span class="status-label">@release.Status</span>
+                                <span class="status-label status-@StatusKey(release.Status)">@release.Status</span>
                                 <h2>@release.Version</h2>
                                 <p>@(release.ReleaseDate?.ToString("dd MMM yyyy") ?? "No release date") · @release.ReleaseWorkItems.Count task@(release.ReleaseWorkItems.Count == 1 ? "" : "s")</p>
                             </div>
@@ -275,6 +275,8 @@ else
         task.WorkItemAccounts.Select(link => link.AccountPractice.Name).FirstOrDefault()
         ?? task.AccountPractice?.Name
         ?? "All accounts";
+
+    private static string StatusKey(string value) => value.ToLowerInvariant().Replace(" ", "-");
 
     private static ReleasePlan NewReleasePlan() => new()
     {

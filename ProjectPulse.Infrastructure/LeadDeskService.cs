@@ -69,13 +69,13 @@ public sealed class LeadDeskService(IDbContextFactory<LeadDeskDbContext> context
                 .ThenBy(x => x.DueDate ?? DateTime.MaxValue)
                 .ThenByDescending(x => x.UpdatedAt ?? x.CreatedAt)
         };
-        return await items.AsNoTracking().ToListAsync(cancellationToken);
+        return await items.AsNoTracking().AsSplitQuery().ToListAsync(cancellationToken);
     }
 
     public async Task<WorkItem?> GetTaskAsync(long id, CancellationToken cancellationToken = default)
     {
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var item = await TaskGraph(db.WorkItems).Include(x => x.Owner).Include(x => x.Updates).ThenInclude(x => x.UpdatedBy).Include(x => x.Attachments).AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+        var item = await TaskGraph(db.WorkItems).Include(x => x.Owner).Include(x => x.Updates).ThenInclude(x => x.UpdatedBy).Include(x => x.Attachments).AsNoTracking().AsSplitQuery().FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (item != null)
         {
             item.SelectedAccountIds = item.WorkItemAccounts.Select(x => x.AccountPracticeId).ToList();
@@ -120,6 +120,55 @@ public sealed class LeadDeskService(IDbContextFactory<LeadDeskDbContext> context
         item.LatestUpdate = $"Status changed from {old} to {status}.";
         item.UpdatedAt = DateTime.UtcNow;
         db.WorkItemUpdates.Add(new WorkItemUpdate { WorkItemId = id, OldStatus = old, NewStatus = status, UpdateText = item.LatestUpdate });
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UpdateTaskAssigneeAsync(long id, long? teamMemberId, CancellationToken cancellationToken = default)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var item = await db.WorkItems.FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new InvalidOperationException("Task not found.");
+        TeamMember? member = null;
+        if (teamMemberId.HasValue)
+        {
+            member = await db.TeamMembers.FirstOrDefaultAsync(x => x.Id == teamMemberId.Value && x.IsActive, cancellationToken)
+                ?? throw new InvalidOperationException("Team member not found or inactive.");
+        }
+
+        await db.WorkItemDevelopers.Where(x => x.WorkItemId == id).ExecuteDeleteAsync(cancellationToken);
+        item.AssignedDeveloperId = teamMemberId;
+        item.UpdatedAt = DateTime.UtcNow;
+        item.LatestUpdate = member == null ? "Task moved to Unassigned." : $"Task assigned to {member.FullName}.";
+        if (teamMemberId.HasValue)
+            db.WorkItemDevelopers.Add(new WorkItemDeveloper { WorkItemId = id, TeamMemberId = teamMemberId.Value });
+        db.WorkItemUpdates.Add(new WorkItemUpdate { WorkItemId = id, UpdateText = item.LatestUpdate });
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task UpdateBoardTaskAsync(BoardTaskUpdate update, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(update.Title)) throw new InvalidOperationException("Task title is required.");
+        if (!LeadDeskOptions.Statuses.Contains(update.Status)) throw new ArgumentOutOfRangeException(nameof(update.Status));
+        if (!LeadDeskOptions.Priorities.Contains(update.Priority)) throw new ArgumentOutOfRangeException(nameof(update.Priority));
+
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var item = await db.WorkItems.FirstOrDefaultAsync(x => x.Id == update.Id, cancellationToken)
+            ?? throw new InvalidOperationException("Task not found.");
+        if (update.TeamMemberId.HasValue && !await db.TeamMembers.AnyAsync(x => x.Id == update.TeamMemberId.Value && x.IsActive, cancellationToken))
+            throw new InvalidOperationException("Team member not found or inactive.");
+
+        var oldStatus = item.Status;
+        item.Title = update.Title.Trim();
+        item.Status = update.Status;
+        item.Priority = update.Priority;
+        item.DueDate = update.DueDate;
+        item.AssignedDeveloperId = update.TeamMemberId;
+        item.UpdatedAt = DateTime.UtcNow;
+        await db.WorkItemDevelopers.Where(x => x.WorkItemId == update.Id).ExecuteDeleteAsync(cancellationToken);
+        if (update.TeamMemberId.HasValue)
+            db.WorkItemDevelopers.Add(new WorkItemDeveloper { WorkItemId = update.Id, TeamMemberId = update.TeamMemberId.Value });
+        if (oldStatus != update.Status)
+            db.WorkItemUpdates.Add(new WorkItemUpdate { WorkItemId = update.Id, OldStatus = oldStatus, NewStatus = update.Status, UpdateText = $"Status changed from {oldStatus} to {update.Status}." });
         await db.SaveChangesAsync(cancellationToken);
     }
 

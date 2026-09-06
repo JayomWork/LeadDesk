@@ -112,6 +112,16 @@ public interface IAIWritingService
     Task<AIWritingResponseDto> ImproveTextAsync(AIWritingRequestDto request, CancellationToken cancellationToken = default);
 }
 
+public sealed class BoardTaskUpdate
+{
+    public long Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Status { get; set; } = "New";
+    public string Priority { get; set; } = "Medium";
+    public long? TeamMemberId { get; set; }
+    public DateTime? DueDate { get; set; }
+}
+
 public interface ILeadDeskService
 {
     event Action? ImportantTasksChanged;
@@ -120,6 +130,8 @@ public interface ILeadDeskService
     Task<WorkItem?> GetTaskAsync(long id, CancellationToken cancellationToken = default);
     Task<long> SaveTaskAsync(WorkItem item, CancellationToken cancellationToken = default);
     Task UpdateTaskStatusAsync(long id, string status, CancellationToken cancellationToken = default);
+    Task UpdateTaskAssigneeAsync(long id, long? teamMemberId, CancellationToken cancellationToken = default);
+    Task UpdateBoardTaskAsync(BoardTaskUpdate update, CancellationToken cancellationToken = default);
     Task UpdateTaskImportanceAsync(long id, bool isImportant, CancellationToken cancellationToken = default);
     Task<List<WorkItem>> GetImportantTasksAsync(CancellationToken cancellationToken = default);
     Task ArchiveTaskAsync(long id, CancellationToken cancellationToken = default);

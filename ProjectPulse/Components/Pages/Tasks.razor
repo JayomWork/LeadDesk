@@ -5,7 +5,13 @@
 
 <div class="page-heading">
     <div><span class="eyebrow">Delivery board</span><h1>Tasks</h1><p>Plan, assign and move work without leaving the list.</p></div>
-    <a class="primary-button" href="tasks/new">+ New task</a>
+    <div class="page-heading-actions">
+        <div class="view-switch" aria-label="Task view">
+            <button type="button" class="@(viewMode == "List" ? "active" : null)" @onclick='() => viewMode = "List"'>☷ List</button>
+            <button type="button" class="@(viewMode == "Board" ? "active" : null)" @onclick='() => viewMode = "Board"'>▦ Board</button>
+        </div>
+        <a class="primary-button" href="tasks/new">+ New task</a>
+    </div>
 </div>
 
 <section class="surface filter-surface">
@@ -21,14 +27,35 @@
     </div>
 </section>
 
-<section class="surface">
+@if (viewMode == "Board")
+{
+    <div class="board-toolbar">
+        <div>
+            <span class="eyebrow">Group board by</span>
+            <div class="segmented-control">
+                <button type="button" class="@(boardGroup == "Status" ? "active" : null)" @onclick='() => boardGroup = "Status"'>Task status</button>
+                <button type="button" class="@(boardGroup == "Person" ? "active" : null)" @onclick='() => boardGroup = "Person"'>Person</button>
+            </div>
+        </div>
+        <p>Drag a card to another column to update it automatically.</p>
+    </div>
+}
+
+<section class="surface @(viewMode == "Board" ? "board-surface" : null)">
     @if (isLoading)
     {
         <div class="loading"><span class="loader"></span>Loading tasks...</div>
     }
     else
     {
-        <TaskTable Items="items" OnStatusChanged="ChangeStatus" />
+        @if (viewMode == "Board")
+        {
+            <TaskBoard Items="items" Team="team" GroupBy="@boardGroup" OnStatusChanged="ChangeStatus" OnAssigneeChanged="ChangeAssignee" OnTaskCreated="CreateBoardTask" OnTaskEdited="EditBoardTask" />
+        }
+        else
+        {
+            <TaskTable Items="items" OnStatusChanged="ChangeStatus" />
+        }
     }
 </section>
 
@@ -38,11 +65,16 @@
     private List<AccountPractice> accounts = [];
     private List<TeamMember> team = [];
     private bool isLoading = true;
+    private string viewMode = "Board";
+    private string boardGroup = "Status";
 
     protected override async Task OnInitializedAsync()
     {
-        accounts = await LeadDesk.GetAccountsAsync();
-        team = await LeadDesk.GetTeamAsync(true);
+        var accountsTask = LeadDesk.GetAccountsAsync();
+        var teamTask = LeadDesk.GetTeamAsync(true);
+        await Task.WhenAll(accountsTask, teamTask);
+        accounts = await accountsTask;
+        team = await teamTask;
         await Load();
     }
 
@@ -55,7 +87,68 @@
 
     private async Task ChangeStatus((WorkItem Item, string Status) change)
     {
-        await LeadDesk.UpdateTaskStatusAsync(change.Item.Id, change.Status);
-        await Load();
+        var oldStatus = change.Item.Status;
+        change.Item.Status = change.Status;
+        StateHasChanged();
+        try
+        {
+            await LeadDesk.UpdateTaskStatusAsync(change.Item.Id, change.Status);
+        }
+        catch
+        {
+            change.Item.Status = oldStatus;
+            StateHasChanged();
+            throw;
+        }
+    }
+
+    private async Task ChangeAssignee((WorkItem Item, long? TeamMemberId) change)
+    {
+        var oldAssignedId = change.Item.AssignedDeveloperId;
+        var oldAssigned = change.Item.AssignedDeveloper;
+        var oldLinks = change.Item.WorkItemDevelopers.ToList();
+        ApplyAssignee(change.Item, change.TeamMemberId);
+        StateHasChanged();
+        try
+        {
+            await LeadDesk.UpdateTaskAssigneeAsync(change.Item.Id, change.TeamMemberId);
+        }
+        catch
+        {
+            change.Item.AssignedDeveloperId = oldAssignedId;
+            change.Item.AssignedDeveloper = oldAssigned;
+            change.Item.WorkItemDevelopers = oldLinks;
+            StateHasChanged();
+            throw;
+        }
+    }
+
+    private async Task CreateBoardTask(WorkItem item)
+    {
+        ApplyAssignee(item, item.AssignedDeveloperId);
+        var id = await LeadDesk.SaveTaskAsync(item);
+        item.Id = id;
+        items.Insert(0, item);
+    }
+
+    private async Task EditBoardTask(BoardTaskUpdate update)
+    {
+        await LeadDesk.UpdateBoardTaskAsync(update);
+        var item = items.First(x => x.Id == update.Id);
+        item.Title = update.Title.Trim();
+        item.Status = update.Status;
+        item.Priority = update.Priority;
+        item.DueDate = update.DueDate;
+        ApplyAssignee(item, update.TeamMemberId);
+    }
+
+    private void ApplyAssignee(WorkItem item, long? teamMemberId)
+    {
+        var member = team.FirstOrDefault(x => x.Id == teamMemberId);
+        item.AssignedDeveloperId = member?.Id;
+        item.AssignedDeveloper = member;
+        item.WorkItemDevelopers = member == null
+            ? []
+            : [new WorkItemDeveloper { WorkItemId = item.Id, TeamMemberId = member.Id, TeamMember = member, WorkItem = item }];
     }
 }
