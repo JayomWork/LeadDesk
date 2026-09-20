@@ -154,22 +154,60 @@ public sealed class LeadDeskService(IDbContextFactory<LeadDeskDbContext> context
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
         var item = await db.WorkItems.FirstOrDefaultAsync(x => x.Id == update.Id, cancellationToken)
             ?? throw new InvalidOperationException("Task not found.");
-        if (update.TeamMemberId.HasValue && !await db.TeamMembers.AnyAsync(x => x.Id == update.TeamMemberId.Value && x.IsActive, cancellationToken))
+        if (update.UpdateAssignee && update.TeamMemberId.HasValue && !await db.TeamMembers.AnyAsync(x => x.Id == update.TeamMemberId.Value && x.IsActive, cancellationToken))
             throw new InvalidOperationException("Team member not found or inactive.");
+        if (update.UpdateAccount && update.AccountId.HasValue && !await db.AccountPractices.AnyAsync(x => x.Id == update.AccountId.Value, cancellationToken))
+            throw new InvalidOperationException("Account not found.");
 
         var oldStatus = item.Status;
         item.Title = update.Title.Trim();
         item.Status = update.Status;
         item.Priority = update.Priority;
         item.DueDate = update.DueDate;
-        item.AssignedDeveloperId = update.TeamMemberId;
+        if (update.UpdateAssignee) item.AssignedDeveloperId = update.TeamMemberId;
+        if (update.UpdateAccount) item.AccountPracticeId = update.AccountId;
         item.UpdatedAt = DateTime.UtcNow;
-        await db.WorkItemDevelopers.Where(x => x.WorkItemId == update.Id).ExecuteDeleteAsync(cancellationToken);
-        if (update.TeamMemberId.HasValue)
-            db.WorkItemDevelopers.Add(new WorkItemDeveloper { WorkItemId = update.Id, TeamMemberId = update.TeamMemberId.Value });
+        if (update.UpdateAssignee)
+        {
+            await db.WorkItemDevelopers.Where(x => x.WorkItemId == update.Id).ExecuteDeleteAsync(cancellationToken);
+            if (update.TeamMemberId.HasValue)
+                db.WorkItemDevelopers.Add(new WorkItemDeveloper { WorkItemId = update.Id, TeamMemberId = update.TeamMemberId.Value });
+        }
+        if (update.UpdateAccount)
+        {
+            await db.WorkItemAccounts.Where(x => x.WorkItemId == update.Id).ExecuteDeleteAsync(cancellationToken);
+            if (update.AccountId.HasValue)
+                db.WorkItemAccounts.Add(new WorkItemAccount { WorkItemId = update.Id, AccountPracticeId = update.AccountId.Value });
+        }
         if (oldStatus != update.Status)
             db.WorkItemUpdates.Add(new WorkItemUpdate { WorkItemId = update.Id, OldStatus = oldStatus, NewStatus = update.Status, UpdateText = $"Status changed from {oldStatus} to {update.Status}." });
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task MoveNotebookTaskAsync(long taskId, long targetTaskId, CancellationToken cancellationToken = default)
+    {
+        if (taskId == targetTaskId) return;
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var ordered = await db.WorkItems.OrderBy(x => x.NotebookOrder ?? long.MaxValue).ThenBy(x => x.Id).ToListAsync(cancellationToken);
+        var task = ordered.FirstOrDefault(x => x.Id == taskId) ?? throw new InvalidOperationException("Task not found.");
+        var target = ordered.FirstOrDefault(x => x.Id == targetTaskId) ?? throw new InvalidOperationException("Target task not found.");
+        var movingDown = ordered.IndexOf(task) < ordered.IndexOf(target);
+        ordered.Remove(task);
+        ordered.Insert(ordered.IndexOf(target) + (movingDown ? 1 : 0), task);
+        for (var index = 0; index < ordered.Count; index++)
+            ordered[index].NotebookOrder = index + 1;
+        await db.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeleteTaskAsync(long id, CancellationToken cancellationToken = default)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var item = await db.WorkItems.FirstOrDefaultAsync(x => x.Id == id, cancellationToken)
+            ?? throw new InvalidOperationException("Task not found.");
+        item.IsDeleted = true;
+        item.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+        ImportantTasksChanged?.Invoke();
     }
 
     public async Task ArchiveTaskAsync(long id, CancellationToken cancellationToken = default) => await UpdateTaskStatusAsync(id, "Completed", cancellationToken);

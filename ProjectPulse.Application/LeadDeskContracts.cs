@@ -120,6 +120,9 @@ public sealed class BoardTaskUpdate
     public string Priority { get; set; } = "Medium";
     public long? TeamMemberId { get; set; }
     public DateTime? DueDate { get; set; }
+    public bool UpdateAssignee { get; set; } = true;
+    public bool UpdateAccount { get; set; }
+    public long? AccountId { get; set; }
 }
 
 public interface ILeadDeskService
@@ -132,6 +135,8 @@ public interface ILeadDeskService
     Task UpdateTaskStatusAsync(long id, string status, CancellationToken cancellationToken = default);
     Task UpdateTaskAssigneeAsync(long id, long? teamMemberId, CancellationToken cancellationToken = default);
     Task UpdateBoardTaskAsync(BoardTaskUpdate update, CancellationToken cancellationToken = default);
+    Task MoveNotebookTaskAsync(long taskId, long targetTaskId, CancellationToken cancellationToken = default);
+    Task DeleteTaskAsync(long id, CancellationToken cancellationToken = default);
     Task UpdateTaskImportanceAsync(long id, bool isImportant, CancellationToken cancellationToken = default);
     Task<List<WorkItem>> GetImportantTasksAsync(CancellationToken cancellationToken = default);
     Task ArchiveTaskAsync(long id, CancellationToken cancellationToken = default);

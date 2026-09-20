@@ -55,6 +55,7 @@ public class WorkItem
     public bool IsClientVisible { get; set; }
     public bool IsImportant { get; set; }
     public bool IsDeleted { get; set; }
+    public long? NotebookOrder { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
     public ICollection<WorkItemUpdate> Updates { get; set; } = [];

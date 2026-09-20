@@ -41,6 +41,11 @@ await using (var scope = app.Services.CreateAsyncScope())
         BEGIN
             ALTER TABLE [ReleaseWorkItems] ADD [SortOrder] int NOT NULL CONSTRAINT [DF_ReleaseWorkItems_SortOrder] DEFAULT 0;
         END
+
+        IF COL_LENGTH('WorkItems', 'NotebookOrder') IS NULL
+        BEGIN
+            ALTER TABLE [WorkItems] ADD [NotebookOrder] bigint NULL;
+        END
         """);
 }
 if (!app.Environment.IsDevelopment())

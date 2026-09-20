@@ -1,0 +1,273 @@
+<div class="notebook-page">
+    <div class="notebook-page-head"><span>MY WORK NOTEBOOK</span><span>@DateTime.Today.ToString("dddd, dd MMMM yyyy")</span></div>
+    <div class="notebook-controls">
+        <label for="notebook-group">Group tasks by</label>
+        <select id="notebook-group" class="input select-input" @bind="groupBy"><option value="Developer">Person</option><option value="Account">Account</option><option value="Status">Task status</option><option value="None">No grouping</option></select>
+        <label for="notebook-sort">Sort within each group</label>
+        <select id="notebook-sort" class="input select-input" @bind="sortBy"><option value="Manual">Manual</option><option value="Priority">Priority</option><option value="Status">Status</option></select>
+        <span>In Manual order, drag a task onto another row to set its work sequence.</span>
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(message))
+    {
+        <div class="notebook-message" role="alert">@message <button type="button" @onclick="() => message = null">Dismiss</button></div>
+    }
+
+    @foreach (var section in Sections)
+    {
+        <section class="notebook-section">
+            <div class="notebook-section-head @(draggedId.HasValue && dropGroupName == section.Name ? "is-drop-target" : null)" @ondragenter="() => dropGroupName = section.Name" @ondragover:preventDefault="true" @ondrop="() => DropOnGroup(section.Name)"><h2>@section.Name <span class="notebook-section-count">@section.Tasks.Count</span></h2><button type="button" class="notebook-add-group" @onclick="() => BeginCreate(section.Name)">+ Add task</button></div>
+            @if (newGroupName == section.Name)
+            {
+                <div class="notebook-quick-add">
+                    <input class="input" aria-label="New task title" placeholder="Task name" maxlength="250" @bind="newTitle" @bind:event="oninput" @onkeydown="NewTaskKeyDown" />
+                    <select class="input select-input" aria-label="Account" @bind="newAccountId"><option value="">All accounts</option>@foreach (var account in Accounts) { <option value="@account.Id">@account.Name</option> }</select>
+                    <select class="input select-input" aria-label="Developer" @bind="newDeveloperId"><option value="">Unassigned</option>@foreach (var member in Team) { <option value="@member.Id">@member.FullName</option> }</select>
+                    <select class="input select-input" aria-label="Status" @bind="newStatus">@foreach (var status in LeadDeskOptions.Statuses) { <option value="@status">@status</option> }</select>
+                    <select class="input select-input" aria-label="Priority" @bind="newPriority">@foreach (var priority in LeadDeskOptions.Priorities) { <option value="@priority">@priority</option> }</select>
+                    <div class="notebook-quick-add-actions"><button type="button" class="primary-button small" disabled="@busy" @onclick="Create">Save task</button><button type="button" class="secondary-button small" @onclick="CancelCreate">Cancel</button></div>
+                </div>
+            }
+            @foreach (var task in section.Tasks)
+            {
+                <div class="notebook-row @(task.Status == "Completed" ? "is-complete" : null) @(draggedId == task.Id ? "is-dragging" : null) @(dropTargetId == task.Id ? "is-drop-target" : null)"
+                     @key="task.Id"
+                     @ondragenter="() => dropTargetId = task.Id"
+                     @ondragover:preventDefault="true"
+                     @ondrop="() => DropOn(task.Id, section.Name)">
+                    <button type="button" class="notebook-check @(task.Status == "Completed" ? "checked" : null)" title="@(task.Status == "Completed" ? "Reopen task" : "Complete task")" aria-label="@(task.Status == "Completed" ? "Reopen task" : "Complete task")" @onclick="() => ToggleComplete(task)">@(task.Status == "Completed" ? "✓" : "")</button>
+                    @if (editingId == task.Id)
+                    {
+                        <div class="notebook-editor">
+                            <input class="input" maxlength="250" aria-label="Task title" @bind="editTitle" @bind:event="oninput" />
+                            <div class="notebook-editor-fields">
+                                <select class="input select-input" aria-label="Account" @bind="editAccountId"><option value="">All accounts</option>@foreach (var account in Accounts) { <option value="@account.Id">@account.Name</option> }</select>
+                                <select class="input select-input" aria-label="Developer" @bind="editDeveloperId"><option value="">Unassigned</option>@foreach (var member in Team) { <option value="@member.Id">@member.FullName</option> }</select>
+                                <select class="input select-input" aria-label="Status" @bind="editStatus">@foreach (var status in LeadDeskOptions.Statuses) { <option value="@status">@status</option> }</select>
+                                <select class="input select-input" aria-label="Priority" @bind="editPriority">@foreach (var priority in LeadDeskOptions.Priorities) { <option value="@priority">@priority</option> }</select>
+                                <InputDate class="input" aria-label="Due date" @bind-Value="editDueDate" />
+                            </div>
+                            <div class="notebook-editor-actions"><button class="primary-button small" type="button" disabled="@busy" @onclick="() => SaveEdit(task)">Save</button><button class="secondary-button small" type="button" disabled="@busy" @onclick="CancelEdit">Cancel</button></div>
+                        </div>
+                    }
+                    else
+                    {
+                        <button type="button" class="notebook-title" title="Click to edit" @onclick="() => BeginEdit(task)">@task.Title</button>
+                        <button type="button" class="notebook-account" title="Edit account" @onclick="() => BeginEdit(task)">@AccountName(task)</button>
+                        <button type="button" class="notebook-person" title="Edit developer" @onclick="() => BeginEdit(task)"><span class="notebook-avatar">@Initial(DeveloperName(task))</span>@DeveloperName(task)</button>
+                        <button type="button" class="notebook-due @(task.DueDate?.Date < DateTime.Today && task.Status != "Completed" ? "is-overdue" : null)" title="Edit due date" @onclick="() => BeginEdit(task)">@(task.DueDate?.ToString("dd MMM") ?? "No date")</button>
+                        <select class="notebook-priority priority-@Key(task.Priority)" aria-label="Priority for @task.Title" value="@task.Priority" @onchange="e => ChangePriority(task, e.Value?.ToString() ?? task.Priority)">@foreach (var priority in LeadDeskOptions.Priorities) { <option value="@priority">@priority</option> }</select>
+                        <select class="notebook-status status-@Key(task.Status)" aria-label="Status for @task.Title" value="@task.Status" @onchange="e => ChangeStatus(task, e.Value?.ToString() ?? task.Status)">@foreach (var status in LeadDeskOptions.Statuses) { <option value="@status">@status</option> }</select>
+                    }
+                    <div class="notebook-row-actions">
+                        <button type="button" class="notebook-move" title="Move task up" aria-label="Move @task.Title up" disabled="@(busy || sortBy != "Manual" || section.Tasks.IndexOf(task) == 0)" @onclick="() => MoveOne(task, section.Tasks, -1)">↑</button>
+                        <button type="button" class="notebook-move" title="Move task down" aria-label="Move @task.Title down" disabled="@(busy || sortBy != "Manual" || section.Tasks.IndexOf(task) == section.Tasks.Count - 1)" @onclick="() => MoveOne(task, section.Tasks, 1)">↓</button>
+                        <span class="notebook-drag" data-task-id="@task.Id" draggable="@(sortBy == "Manual" ? "true" : "false")" title="@(sortBy == "Manual" ? "Drag onto a task to set its sequence" : "Choose Manual sort to reorder")" aria-label="Drag to move @task.Title" @ondragstart="() => StartDrag(task.Id, section.Name)" @ondragend="EndDrag"><span class="notebook-position">@(section.Tasks.IndexOf(task) + 1)</span><span aria-hidden="true">⋮⋮</span></span>
+                        <button type="button" class="notebook-icon" title="More actions" aria-label="More actions for @task.Title" @onclick="() => menuId = menuId == task.Id ? null : task.Id">⋯</button>
+                        <button type="button" class="notebook-icon danger" title="Delete task" aria-label="Delete @task.Title" @onclick="() => deleteId = task.Id">×</button>
+                        @if (menuId == task.Id)
+                        {
+                            <div class="notebook-menu"><a href="tasks/@task.Id">View details</a><a href="tasks/@task.Id/edit">Full edit</a><button type="button" @onclick="() => BeginEdit(task)">Quick edit</button></div>
+                        }
+                    </div>
+                    @if (deleteId == task.Id)
+                    {
+                        <div class="notebook-delete-confirm" role="group" aria-label="Confirm delete"><span>Delete this task?</span><button type="button" disabled="@busy" @onclick="() => Delete(task)">Delete</button><button type="button" @onclick="() => deleteId = null">Cancel</button></div>
+                    }
+                </div>
+            }
+        </section>
+    }
+
+    <div class="notebook-footer"><span>@Items.Count tasks · @Items.Count(x => x.Status == "Completed") completed</span><span>Small steps. Better care.</span></div>
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<WorkItem> Items { get; set; } = [];
+    [Parameter] public IReadOnlyList<AccountPractice> Accounts { get; set; } = [];
+    [Parameter] public IReadOnlyList<TeamMember> Team { get; set; } = [];
+    [Parameter] public EventCallback<WorkItem> OnCreate { get; set; }
+    [Parameter] public EventCallback<(WorkItem Item, BoardTaskUpdate Update, long? AccountId)> OnEdit { get; set; }
+    [Parameter] public EventCallback<(long TaskId, long TargetId)> OnMove { get; set; }
+    [Parameter] public EventCallback<WorkItem> OnDelete { get; set; }
+
+    private long? editingId, draggedId, dropTargetId, menuId, deleteId;
+    private string editTitle = string.Empty, editStatus = "New", editPriority = "Medium", newTitle = string.Empty;
+    private string? newGroupName;
+    private string newStatus = "New", newPriority = "Medium";
+    private long? newDeveloperId, newAccountId;
+    private long? editDeveloperId, editAccountId;
+    private long? originalDeveloperId, originalAccountId;
+    private DateTime? editDueDate;
+    private bool busy;
+    private string? message;
+    private string groupBy = "Developer";
+    private string sortBy = "Manual";
+    private string? draggedGroupName, dropGroupName;
+
+    private IEnumerable<(string Name, List<WorkItem> Tasks)> Sections
+    {
+        get
+        {
+            if (groupBy == "None")
+            {
+                yield return ("All tasks", SortTasks(Items).ToList());
+                yield break;
+            }
+
+            var groups = Items
+                .SelectMany(item => GroupNames(item).Distinct().Select(name => (Name: name, Item: item)))
+                .GroupBy(x => x.Name)
+                .OrderBy(x => groupBy == "Status" ? Array.IndexOf(LeadDeskOptions.Statuses, x.Key) : int.MaxValue)
+                .ThenBy(x => x.Key);
+            foreach (var group in groups)
+                yield return (group.Key, SortTasks(group.Select(x => x.Item)).ToList());
+        }
+    }
+
+    private IEnumerable<string> GroupNames(WorkItem item) => groupBy switch
+    {
+        "Developer" => item.WorkItemDevelopers.Select(x => x.TeamMember.FullName)
+            .DefaultIfEmpty(item.AssignedDeveloper?.FullName ?? "Unassigned"),
+        "Status" => [item.Status],
+        _ => item.WorkItemAccounts.Select(x => x.AccountPractice.Name)
+            .DefaultIfEmpty(item.AccountPractice?.Name ?? "All accounts")
+    };
+
+    private IOrderedEnumerable<WorkItem> SortTasks(IEnumerable<WorkItem> tasks) => sortBy switch
+    {
+        "Priority" => tasks.OrderBy(x => Array.IndexOf(["Critical", "High", "Medium", "Low"], x.Priority))
+            .ThenBy(x => x.DueDate ?? DateTime.MaxValue).ThenBy(x => x.Id),
+        "Status" => tasks.OrderBy(x => Array.IndexOf(LeadDeskOptions.Statuses, x.Status))
+            .ThenBy(x => x.DueDate ?? DateTime.MaxValue).ThenBy(x => x.Id),
+        _ => tasks.OrderBy(x => x.NotebookOrder ?? long.MaxValue).ThenBy(x => x.Id)
+    };
+
+    private void BeginEdit(WorkItem item)
+    {
+        menuId = null;
+        editingId = item.Id;
+        editTitle = item.Title;
+        editStatus = item.Status;
+        editPriority = item.Priority;
+        editDeveloperId = item.WorkItemDevelopers.Select(x => (long?)x.TeamMemberId).FirstOrDefault() ?? item.AssignedDeveloperId;
+        editAccountId = item.WorkItemAccounts.Select(x => (long?)x.AccountPracticeId).FirstOrDefault() ?? item.AccountPracticeId;
+        originalDeveloperId = editDeveloperId;
+        originalAccountId = editAccountId;
+        editDueDate = item.DueDate;
+    }
+
+    private void CancelEdit() => editingId = null;
+
+    private void BeginCreate(string groupName)
+    {
+        newGroupName = groupName;
+        newTitle = string.Empty;
+        newStatus = groupBy == "Status" ? groupName : "New";
+        newPriority = "Medium";
+        newDeveloperId = groupBy == "Developer" ? Team.FirstOrDefault(x => x.FullName == groupName)?.Id : null;
+        newAccountId = groupBy == "Account" ? Accounts.FirstOrDefault(x => x.Name == groupName)?.Id : null;
+    }
+
+    private void CancelCreate()
+    {
+        newGroupName = null;
+        newTitle = string.Empty;
+    }
+
+    private async Task SaveEdit(WorkItem item)
+    {
+        if (string.IsNullOrWhiteSpace(editTitle)) { message = "Enter a task title."; return; }
+        await Run(async () =>
+        {
+            await OnEdit.InvokeAsync((item, new BoardTaskUpdate { Id = item.Id, Title = editTitle, Status = editStatus, Priority = editPriority, TeamMemberId = editDeveloperId, DueDate = editDueDate, UpdateAssignee = editDeveloperId != originalDeveloperId, UpdateAccount = editAccountId != originalAccountId, AccountId = editAccountId }, editAccountId));
+            editingId = null;
+        });
+    }
+
+    private Task ChangeStatus(WorkItem item, string status) => UpdateField(item, status, item.Priority);
+    private Task ChangePriority(WorkItem item, string priority) => UpdateField(item, item.Status, priority);
+    private Task ToggleComplete(WorkItem item) => UpdateField(item, item.Status == "Completed" ? "New" : "Completed", item.Priority);
+
+    private Task UpdateField(WorkItem item, string status, string priority) => Run(() => OnEdit.InvokeAsync((item,
+        new BoardTaskUpdate { Id = item.Id, Title = item.Title, Status = status, Priority = priority, TeamMemberId = item.AssignedDeveloperId, DueDate = item.DueDate, UpdateAssignee = false }, item.AccountPracticeId)));
+
+    private void StartDrag(long taskId, string groupName) { draggedId = taskId; draggedGroupName = groupName; }
+
+    private Task MoveOne(WorkItem task, List<WorkItem> groupTasks, int direction)
+    {
+        var currentIndex = groupTasks.IndexOf(task);
+        var targetIndex = currentIndex + direction;
+        return sortBy == "Manual" && targetIndex >= 0 && targetIndex < groupTasks.Count
+            ? Run(() => OnMove.InvokeAsync((task.Id, groupTasks[targetIndex].Id)))
+            : Task.CompletedTask;
+    }
+
+    private Task DropOn(long targetId, string targetGroup)
+    {
+        var sourceId = draggedId;
+        var sourceGroup = draggedGroupName;
+        EndDrag();
+        if (!sourceId.HasValue || sourceId.Value == targetId) return Task.CompletedTask;
+        return Run(async () =>
+        {
+            if (sourceGroup != targetGroup) await MoveToGroup(sourceId.Value, targetGroup);
+            await OnMove.InvokeAsync((sourceId.Value, targetId));
+        });
+    }
+
+    private Task DropOnGroup(string targetGroup)
+    {
+        var sourceId = draggedId;
+        var sourceGroup = draggedGroupName;
+        EndDrag();
+        return sourceId.HasValue && sourceGroup != targetGroup ? Run(() => MoveToGroup(sourceId.Value, targetGroup)) : Task.CompletedTask;
+    }
+
+    private Task MoveToGroup(long sourceId, string targetGroup)
+    {
+        var item = Items.First(x => x.Id == sourceId);
+        var update = new BoardTaskUpdate { Id = item.Id, Title = item.Title, Status = item.Status, Priority = item.Priority, TeamMemberId = item.AssignedDeveloperId, DueDate = item.DueDate };
+        var accountId = item.AccountPracticeId;
+        if (groupBy == "Developer")
+        {
+            update.TeamMemberId = Team.FirstOrDefault(x => x.FullName == targetGroup)?.Id;
+            update.UpdateAssignee = true;
+        }
+        else if (groupBy == "Account")
+        {
+            accountId = Accounts.FirstOrDefault(x => x.Name == targetGroup)?.Id;
+            update.AccountId = accountId;
+            update.UpdateAccount = true;
+        }
+        else if (groupBy == "Status") update.Status = targetGroup;
+        return OnEdit.InvokeAsync((item, update, accountId));
+    }
+
+    private void EndDrag() { draggedId = null; draggedGroupName = null; dropTargetId = null; dropGroupName = null; }
+
+    private async Task NewTaskKeyDown(KeyboardEventArgs e) { if (e.Key == "Enter") await Create(); }
+    private Task Create() => string.IsNullOrWhiteSpace(newTitle) ? Task.CompletedTask : Run(async () =>
+    {
+        var item = new WorkItem { Title = newTitle.Trim(), Status = newStatus, Priority = newPriority, Type = "Requirement", AssignedDeveloperId = newDeveloperId, AccountPracticeId = newAccountId };
+        if (newDeveloperId.HasValue) item.SelectedDeveloperIds.Add(newDeveloperId.Value);
+        if (newAccountId.HasValue) item.SelectedAccountIds.Add(newAccountId.Value);
+        await OnCreate.InvokeAsync(item);
+        CancelCreate();
+    });
+
+    private Task Delete(WorkItem item) => Run(async () => { await OnDelete.InvokeAsync(item); deleteId = null; });
+
+    private async Task Run(Func<Task> action)
+    {
+        if (busy) return;
+        try { busy = true; message = null; await action(); }
+        catch (Exception ex) { message = ex.Message; }
+        finally { busy = false; }
+    }
+
+    private static string Key(string value) => value.ToLowerInvariant().Replace(" ", "-");
+    private static string Initial(string value) => string.IsNullOrWhiteSpace(value) ? "?" : value.Trim()[..1].ToUpperInvariant();
+    private static string AccountName(WorkItem item) => string.Join(", ", item.WorkItemAccounts.Select(x => x.AccountPractice.Name).DefaultIfEmpty(item.AccountPractice?.Name ?? "All accounts"));
+    private static string DeveloperName(WorkItem item) => item.WorkItemDevelopers.Select(x => x.TeamMember.FullName).FirstOrDefault() ?? item.AssignedDeveloper?.FullName ?? "Unassigned";
+}

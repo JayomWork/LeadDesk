@@ -7,8 +7,9 @@
     <div><span class="eyebrow">Delivery board</span><h1>Tasks</h1><p>Plan, assign and move work without leaving the list.</p></div>
     <div class="page-heading-actions">
         <div class="view-switch" aria-label="Task view">
-            <button type="button" class="@(viewMode == "List" ? "active" : null)" @onclick='() => viewMode = "List"'>☷ List</button>
-            <button type="button" class="@(viewMode == "Board" ? "active" : null)" @onclick='() => viewMode = "Board"'>▦ Board</button>
+            <button type="button" class="@(viewMode == "List" ? "active" : null)" @onclick='() => SwitchView("List")'>☷ List</button>
+            <button type="button" class="@(viewMode == "Board" ? "active" : null)" @onclick='() => SwitchView("Board")'>▦ Cards</button>
+            <button type="button" class="@(viewMode == "Notebook" ? "active" : null)" @onclick='() => SwitchView("Notebook")'>Notebook</button>
         </div>
         <a class="primary-button" href="tasks/new">+ New task</a>
     </div>
@@ -48,7 +49,11 @@
     }
     else
     {
-        @if (viewMode == "Board")
+        @if (viewMode == "Notebook")
+        {
+            <TaskNotebook Items="items" Accounts="accounts" Team="team" OnCreate="CreateBoardTask" OnEdit="EditNotebookTask" OnMove="MoveNotebookTask" OnDelete="DeleteNotebookTask" />
+        }
+        else if (viewMode == "Board")
         {
             <TaskBoard Items="items" Team="team" GroupBy="@boardGroup" OnStatusChanged="ChangeStatus" OnAssigneeChanged="ChangeAssignee" OnTaskCreated="CreateBoardTask" OnTaskEdited="EditBoardTask" />
         }
@@ -67,6 +72,25 @@
     private bool isLoading = true;
     private string viewMode = "Board";
     private string boardGroup = "Status";
+    private bool archivedBeforeNotebook;
+
+    private async Task SwitchView(string view)
+    {
+        if (viewMode == view) return;
+        var previousView = viewMode;
+        viewMode = view;
+        if (view == "Notebook")
+        {
+            archivedBeforeNotebook = query.IncludeArchived;
+            query.IncludeArchived = true;
+            await Load();
+        }
+        else if (previousView == "Notebook")
+        {
+            query.IncludeArchived = archivedBeforeNotebook;
+            await Load();
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -128,6 +152,11 @@
         ApplyAssignee(item, item.AssignedDeveloperId);
         var id = await LeadDesk.SaveTaskAsync(item);
         item.Id = id;
+        if (item.AccountPracticeId is long accountId && accounts.FirstOrDefault(x => x.Id == accountId) is { } account)
+        {
+            item.AccountPractice = account;
+            item.WorkItemAccounts = [new WorkItemAccount { WorkItemId = id, AccountPracticeId = accountId, AccountPractice = account, WorkItem = item }];
+        }
         items.Insert(0, item);
     }
 
@@ -140,6 +169,42 @@
         item.Priority = update.Priority;
         item.DueDate = update.DueDate;
         ApplyAssignee(item, update.TeamMemberId);
+    }
+
+    private async Task EditNotebookTask((WorkItem Item, BoardTaskUpdate Update, long? AccountId) change)
+    {
+        await LeadDesk.UpdateBoardTaskAsync(change.Update);
+        var item = change.Item;
+        item.Title = change.Update.Title.Trim();
+        item.Status = change.Update.Status;
+        item.Priority = change.Update.Priority;
+        item.DueDate = change.Update.DueDate;
+        if (change.Update.UpdateAssignee) ApplyAssignee(item, change.Update.TeamMemberId);
+        if (change.Update.UpdateAccount)
+        {
+            item.AccountPracticeId = change.AccountId;
+            var account = accounts.FirstOrDefault(x => x.Id == change.AccountId);
+            item.AccountPractice = account;
+            item.WorkItemAccounts = account == null ? [] : [new WorkItemAccount { WorkItemId = item.Id, AccountPracticeId = account.Id, AccountPractice = account, WorkItem = item }];
+        }
+    }
+
+    private async Task MoveNotebookTask((long TaskId, long TargetId) move)
+    {
+        await LeadDesk.MoveNotebookTaskAsync(move.TaskId, move.TargetId);
+        var ordered = items.OrderBy(x => x.NotebookOrder ?? long.MaxValue).ThenBy(x => x.Id).ToList();
+        var task = ordered.First(x => x.Id == move.TaskId);
+        var target = ordered.First(x => x.Id == move.TargetId);
+        var movingDown = ordered.IndexOf(task) < ordered.IndexOf(target);
+        ordered.Remove(task);
+        ordered.Insert(ordered.IndexOf(target) + (movingDown ? 1 : 0), task);
+        for (var index = 0; index < ordered.Count; index++) ordered[index].NotebookOrder = index + 1;
+    }
+
+    private async Task DeleteNotebookTask(WorkItem item)
+    {
+        await LeadDesk.DeleteTaskAsync(item.Id);
+        items.Remove(item);
     }
 
     private void ApplyAssignee(WorkItem item, long? teamMemberId)
